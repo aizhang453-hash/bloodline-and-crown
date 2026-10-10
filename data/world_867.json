@@ -1,0 +1,1423 @@
+{
+ "说明": "867 年 1 月 1 日的不列颠群岛。爵位: 帝国 > 王国 > 公国 > 领地 (伯爵领)。holder 是开局时这块领地归哪个国家。ruler 为 null 的国家开局时随机生成统治者 (names 是用哪种名字)。",
+ "start_date": [
+  867,
+  1,
+  1
+ ],
+ "empire": {
+  "id": "britannia",
+  "name": "不列颠"
+ },
+ "kingdoms": [
+  {
+   "id": "england",
+   "name": "英格兰"
+  },
+  {
+   "id": "scotland",
+   "name": "苏格兰"
+  },
+  {
+   "id": "wales",
+   "name": "威尔士"
+  },
+  {
+   "id": "ireland",
+   "name": "爱尔兰"
+  }
+ ],
+ "duchies": [
+  {
+   "id": "wessex",
+   "name": "威塞克斯",
+   "kingdom": "england"
+  },
+  {
+   "id": "kent",
+   "name": "肯特",
+   "kingdom": "england"
+  },
+  {
+   "id": "sussex",
+   "name": "萨塞克斯",
+   "kingdom": "england"
+  },
+  {
+   "id": "essex",
+   "name": "埃塞克斯",
+   "kingdom": "england"
+  },
+  {
+   "id": "mercia",
+   "name": "麦西亚",
+   "kingdom": "england"
+  },
+  {
+   "id": "hwicce",
+   "name": "赫维奇",
+   "kingdom": "england"
+  },
+  {
+   "id": "lindsey",
+   "name": "林齐",
+   "kingdom": "england"
+  },
+  {
+   "id": "east_anglia",
+   "name": "东盎格利亚",
+   "kingdom": "england"
+  },
+  {
+   "id": "deira",
+   "name": "德伊勒",
+   "kingdom": "england"
+  },
+  {
+   "id": "bernicia",
+   "name": "伯尼西亚",
+   "kingdom": "england"
+  },
+  {
+   "id": "cornwall",
+   "name": "康沃尔",
+   "kingdom": "england"
+  },
+  {
+   "id": "gowrie",
+   "name": "戈里",
+   "kingdom": "scotland"
+  },
+  {
+   "id": "moray",
+   "name": "莫里",
+   "kingdom": "scotland"
+  },
+  {
+   "id": "argyll",
+   "name": "阿盖尔",
+   "kingdom": "scotland"
+  },
+  {
+   "id": "strathclyde",
+   "name": "斯特拉斯克莱德",
+   "kingdom": "scotland"
+  },
+  {
+   "id": "lothian",
+   "name": "洛锡安",
+   "kingdom": "scotland"
+  },
+  {
+   "id": "galloway",
+   "name": "加洛韦",
+   "kingdom": "scotland"
+  },
+  {
+   "id": "isles",
+   "name": "群岛",
+   "kingdom": "scotland"
+  },
+  {
+   "id": "orkney",
+   "name": "奥克尼",
+   "kingdom": "scotland"
+  },
+  {
+   "id": "gwynedd",
+   "name": "格温内斯",
+   "kingdom": "wales"
+  },
+  {
+   "id": "powys",
+   "name": "波伊斯",
+   "kingdom": "wales"
+  },
+  {
+   "id": "seisyllwg",
+   "name": "塞瑟西尔格",
+   "kingdom": "wales"
+  },
+  {
+   "id": "dyfed",
+   "name": "德费德",
+   "kingdom": "wales"
+  },
+  {
+   "id": "brycheiniog",
+   "name": "布雷肯",
+   "kingdom": "wales"
+  },
+  {
+   "id": "glywysing",
+   "name": "格利维辛",
+   "kingdom": "wales"
+  },
+  {
+   "id": "gwent",
+   "name": "格温特",
+   "kingdom": "wales"
+  },
+  {
+   "id": "ailech",
+   "name": "艾莱赫",
+   "kingdom": "ireland"
+  },
+  {
+   "id": "ulaid",
+   "name": "乌莱德",
+   "kingdom": "ireland"
+  },
+  {
+   "id": "mide",
+   "name": "米斯",
+   "kingdom": "ireland"
+  },
+  {
+   "id": "leinster",
+   "name": "伦斯特",
+   "kingdom": "ireland"
+  },
+  {
+   "id": "osraige",
+   "name": "奥索里",
+   "kingdom": "ireland"
+  },
+  {
+   "id": "munster",
+   "name": "芒斯特",
+   "kingdom": "ireland"
+  },
+  {
+   "id": "connacht",
+   "name": "康诺特",
+   "kingdom": "ireland"
+  }
+ ],
+ "counties": [
+  {
+   "id": "hampshire",
+   "name": "汉普郡",
+   "duchy": "wessex",
+   "lon": -1.31,
+   "lat": 51.06,
+   "holder": "wessex"
+  },
+  {
+   "id": "wiltshire",
+   "name": "威尔特郡",
+   "duchy": "wessex",
+   "lon": -1.86,
+   "lat": 51.08,
+   "holder": "wessex"
+  },
+  {
+   "id": "dorset",
+   "name": "多塞特",
+   "duchy": "wessex",
+   "lon": -2.44,
+   "lat": 50.71,
+   "holder": "wessex"
+  },
+  {
+   "id": "somerset",
+   "name": "萨默塞特",
+   "duchy": "wessex",
+   "lon": -2.73,
+   "lat": 51.05,
+   "holder": "wessex"
+  },
+  {
+   "id": "devon",
+   "name": "德文",
+   "duchy": "wessex",
+   "lon": -3.53,
+   "lat": 50.72,
+   "holder": "wessex"
+  },
+  {
+   "id": "north_devon",
+   "name": "北德文",
+   "duchy": "wessex",
+   "lon": -4.06,
+   "lat": 51.08,
+   "holder": "wessex"
+  },
+  {
+   "id": "berkshire",
+   "name": "伯克郡",
+   "duchy": "wessex",
+   "lon": -0.97,
+   "lat": 51.45,
+   "holder": "wessex"
+  },
+  {
+   "id": "wight",
+   "name": "怀特岛",
+   "duchy": "wessex",
+   "lon": -1.31,
+   "lat": 50.69,
+   "holder": "wessex"
+  },
+  {
+   "id": "canterbury",
+   "name": "坎特伯雷",
+   "duchy": "kent",
+   "lon": 1.08,
+   "lat": 51.28,
+   "holder": "wessex"
+  },
+  {
+   "id": "rochester",
+   "name": "罗切斯特",
+   "duchy": "kent",
+   "lon": 0.5,
+   "lat": 51.39,
+   "holder": "wessex"
+  },
+  {
+   "id": "chichester",
+   "name": "奇切斯特",
+   "duchy": "sussex",
+   "lon": -0.78,
+   "lat": 50.84,
+   "holder": "wessex"
+  },
+  {
+   "id": "lewes",
+   "name": "刘易斯",
+   "duchy": "sussex",
+   "lon": 0.01,
+   "lat": 50.87,
+   "holder": "wessex"
+  },
+  {
+   "id": "surrey",
+   "name": "萨里",
+   "duchy": "sussex",
+   "lon": -0.3,
+   "lat": 51.41,
+   "holder": "wessex"
+  },
+  {
+   "id": "colchester",
+   "name": "科尔切斯特",
+   "duchy": "essex",
+   "lon": 0.9,
+   "lat": 51.89,
+   "holder": "wessex"
+  },
+  {
+   "id": "london",
+   "name": "伦敦",
+   "duchy": "essex",
+   "lon": -0.1,
+   "lat": 51.51,
+   "holder": "mercia"
+  },
+  {
+   "id": "hertford",
+   "name": "赫特福德",
+   "duchy": "essex",
+   "lon": -0.08,
+   "lat": 51.8,
+   "holder": "mercia"
+  },
+  {
+   "id": "tamworth",
+   "name": "塔姆沃思",
+   "duchy": "mercia",
+   "lon": -1.69,
+   "lat": 52.63,
+   "holder": "mercia"
+  },
+  {
+   "id": "leicester",
+   "name": "莱斯特",
+   "duchy": "mercia",
+   "lon": -1.13,
+   "lat": 52.64,
+   "holder": "mercia"
+  },
+  {
+   "id": "derby",
+   "name": "德比",
+   "duchy": "mercia",
+   "lon": -1.55,
+   "lat": 52.84,
+   "holder": "mercia"
+  },
+  {
+   "id": "nottingham",
+   "name": "诺丁汉",
+   "duchy": "mercia",
+   "lon": -1.15,
+   "lat": 52.95,
+   "holder": "mercia"
+  },
+  {
+   "id": "northampton",
+   "name": "北安普敦",
+   "duchy": "mercia",
+   "lon": -0.9,
+   "lat": 52.24,
+   "holder": "mercia"
+  },
+  {
+   "id": "oxford",
+   "name": "牛津",
+   "duchy": "mercia",
+   "lon": -1.26,
+   "lat": 51.75,
+   "holder": "mercia"
+  },
+  {
+   "id": "buckingham",
+   "name": "白金汉",
+   "duchy": "mercia",
+   "lon": -0.99,
+   "lat": 51.99,
+   "holder": "mercia"
+  },
+  {
+   "id": "bedford",
+   "name": "贝德福德",
+   "duchy": "mercia",
+   "lon": -0.47,
+   "lat": 52.14,
+   "holder": "mercia"
+  },
+  {
+   "id": "huntingdon",
+   "name": "亨廷登",
+   "duchy": "mercia",
+   "lon": -0.18,
+   "lat": 52.33,
+   "holder": "mercia"
+  },
+  {
+   "id": "warwick",
+   "name": "沃里克",
+   "duchy": "mercia",
+   "lon": -1.58,
+   "lat": 52.28,
+   "holder": "mercia"
+  },
+  {
+   "id": "chester",
+   "name": "切斯特",
+   "duchy": "mercia",
+   "lon": -2.89,
+   "lat": 53.19,
+   "holder": "mercia"
+  },
+  {
+   "id": "shrewsbury",
+   "name": "什鲁斯伯里",
+   "duchy": "mercia",
+   "lon": -2.75,
+   "lat": 52.71,
+   "holder": "mercia"
+  },
+  {
+   "id": "stafford",
+   "name": "斯塔福德",
+   "duchy": "mercia",
+   "lon": -2.12,
+   "lat": 52.81,
+   "holder": "mercia"
+  },
+  {
+   "id": "gloucester",
+   "name": "格洛斯特",
+   "duchy": "hwicce",
+   "lon": -2.24,
+   "lat": 51.86,
+   "holder": "mercia"
+  },
+  {
+   "id": "worcester",
+   "name": "伍斯特",
+   "duchy": "hwicce",
+   "lon": -2.22,
+   "lat": 52.19,
+   "holder": "mercia"
+  },
+  {
+   "id": "hereford",
+   "name": "赫里福德",
+   "duchy": "hwicce",
+   "lon": -2.72,
+   "lat": 52.06,
+   "holder": "mercia"
+  },
+  {
+   "id": "lincoln",
+   "name": "林肯",
+   "duchy": "lindsey",
+   "lon": -0.54,
+   "lat": 53.23,
+   "holder": "mercia"
+  },
+  {
+   "id": "louth",
+   "name": "劳斯",
+   "duchy": "lindsey",
+   "lon": 0.0,
+   "lat": 53.37,
+   "holder": "mercia"
+  },
+  {
+   "id": "stamford",
+   "name": "斯坦福德",
+   "duchy": "lindsey",
+   "lon": -0.48,
+   "lat": 52.65,
+   "holder": "mercia"
+  },
+  {
+   "id": "norwich",
+   "name": "诺里奇",
+   "duchy": "east_anglia",
+   "lon": 1.3,
+   "lat": 52.63,
+   "holder": "east_anglia"
+  },
+  {
+   "id": "thetford",
+   "name": "塞特福德",
+   "duchy": "east_anglia",
+   "lon": 0.75,
+   "lat": 52.41,
+   "holder": "east_anglia"
+  },
+  {
+   "id": "ipswich",
+   "name": "伊普斯威奇",
+   "duchy": "east_anglia",
+   "lon": 1.16,
+   "lat": 52.06,
+   "holder": "east_anglia"
+  },
+  {
+   "id": "cambridge",
+   "name": "剑桥",
+   "duchy": "east_anglia",
+   "lon": 0.12,
+   "lat": 52.21,
+   "holder": "east_anglia"
+  },
+  {
+   "id": "york",
+   "name": "约克",
+   "duchy": "deira",
+   "lon": -1.08,
+   "lat": 53.96,
+   "holder": "great_army"
+  },
+  {
+   "id": "beverley",
+   "name": "贝弗利",
+   "duchy": "deira",
+   "lon": -0.43,
+   "lat": 53.84,
+   "holder": "northumbria"
+  },
+  {
+   "id": "ripon",
+   "name": "里彭",
+   "duchy": "deira",
+   "lon": -1.52,
+   "lat": 54.14,
+   "holder": "northumbria"
+  },
+  {
+   "id": "elmet",
+   "name": "埃尔梅特",
+   "duchy": "deira",
+   "lon": -1.55,
+   "lat": 53.8,
+   "holder": "northumbria"
+  },
+  {
+   "id": "doncaster",
+   "name": "唐卡斯特",
+   "duchy": "deira",
+   "lon": -1.13,
+   "lat": 53.52,
+   "holder": "northumbria"
+  },
+  {
+   "id": "whitby",
+   "name": "惠特比",
+   "duchy": "deira",
+   "lon": -0.61,
+   "lat": 54.49,
+   "holder": "northumbria"
+  },
+  {
+   "id": "lancaster",
+   "name": "兰开斯特",
+   "duchy": "deira",
+   "lon": -2.8,
+   "lat": 54.05,
+   "holder": "northumbria"
+  },
+  {
+   "id": "bamburgh",
+   "name": "班堡",
+   "duchy": "bernicia",
+   "lon": -1.71,
+   "lat": 55.61,
+   "holder": "northumbria"
+  },
+  {
+   "id": "jarrow",
+   "name": "贾罗",
+   "duchy": "bernicia",
+   "lon": -1.48,
+   "lat": 54.85,
+   "holder": "northumbria"
+  },
+  {
+   "id": "hexham",
+   "name": "赫克瑟姆",
+   "duchy": "bernicia",
+   "lon": -2.1,
+   "lat": 54.97,
+   "holder": "northumbria"
+  },
+  {
+   "id": "carlisle",
+   "name": "卡莱尔",
+   "duchy": "bernicia",
+   "lon": -2.93,
+   "lat": 54.89,
+   "holder": "northumbria"
+  },
+  {
+   "id": "appleby",
+   "name": "阿普尔比",
+   "duchy": "bernicia",
+   "lon": -2.55,
+   "lat": 54.5,
+   "holder": "northumbria"
+  },
+  {
+   "id": "edinburgh",
+   "name": "爱丁堡",
+   "duchy": "lothian",
+   "lon": -3.19,
+   "lat": 55.95,
+   "holder": "northumbria"
+  },
+  {
+   "id": "dunbar",
+   "name": "邓巴",
+   "duchy": "lothian",
+   "lon": -2.52,
+   "lat": 55.98,
+   "holder": "northumbria"
+  },
+  {
+   "id": "melrose",
+   "name": "梅尔罗斯",
+   "duchy": "lothian",
+   "lon": -2.72,
+   "lat": 55.6,
+   "holder": "northumbria"
+  },
+  {
+   "id": "bodmin",
+   "name": "博德明",
+   "duchy": "cornwall",
+   "lon": -4.72,
+   "lat": 50.47,
+   "holder": "cornwall"
+  },
+  {
+   "id": "penwith",
+   "name": "彭威斯",
+   "duchy": "cornwall",
+   "lon": -5.54,
+   "lat": 50.12,
+   "holder": "cornwall"
+  },
+  {
+   "id": "scone",
+   "name": "斯昆",
+   "duchy": "gowrie",
+   "lon": -3.45,
+   "lat": 56.41,
+   "holder": "alba"
+  },
+  {
+   "id": "fife",
+   "name": "法夫",
+   "duchy": "gowrie",
+   "lon": -2.9,
+   "lat": 56.25,
+   "holder": "alba"
+  },
+  {
+   "id": "angus",
+   "name": "安格斯",
+   "duchy": "gowrie",
+   "lon": -2.89,
+   "lat": 56.64,
+   "holder": "alba"
+  },
+  {
+   "id": "stirling",
+   "name": "斯特灵",
+   "duchy": "gowrie",
+   "lon": -3.94,
+   "lat": 56.12,
+   "holder": "alba"
+  },
+  {
+   "id": "strathearn",
+   "name": "斯特拉森",
+   "duchy": "gowrie",
+   "lon": -3.95,
+   "lat": 56.38,
+   "holder": "alba"
+  },
+  {
+   "id": "atholl",
+   "name": "阿索尔",
+   "duchy": "gowrie",
+   "lon": -3.85,
+   "lat": 56.75,
+   "holder": "alba"
+  },
+  {
+   "id": "mearns",
+   "name": "默恩斯",
+   "duchy": "gowrie",
+   "lon": -2.45,
+   "lat": 56.9,
+   "holder": "alba"
+  },
+  {
+   "id": "mar",
+   "name": "马尔",
+   "duchy": "moray",
+   "lon": -2.2,
+   "lat": 57.15,
+   "holder": "alba"
+  },
+  {
+   "id": "buchan",
+   "name": "布肯",
+   "duchy": "moray",
+   "lon": -2.0,
+   "lat": 57.5,
+   "holder": "alba"
+  },
+  {
+   "id": "elgin",
+   "name": "埃尔金",
+   "duchy": "moray",
+   "lon": -3.32,
+   "lat": 57.62,
+   "holder": "alba"
+  },
+  {
+   "id": "badenoch",
+   "name": "巴德诺赫",
+   "duchy": "moray",
+   "lon": -4.05,
+   "lat": 57.08,
+   "holder": "alba"
+  },
+  {
+   "id": "ross",
+   "name": "罗斯",
+   "duchy": "moray",
+   "lon": -4.43,
+   "lat": 57.6,
+   "holder": "alba"
+  },
+  {
+   "id": "sutherland",
+   "name": "萨瑟兰",
+   "duchy": "moray",
+   "lon": -4.4,
+   "lat": 58.1,
+   "holder": "alba"
+  },
+  {
+   "id": "caithness",
+   "name": "凯斯内斯",
+   "duchy": "moray",
+   "lon": -3.3,
+   "lat": 58.45,
+   "holder": "alba"
+  },
+  {
+   "id": "dunadd",
+   "name": "邓阿德",
+   "duchy": "argyll",
+   "lon": -5.48,
+   "lat": 56.09,
+   "holder": "alba"
+  },
+  {
+   "id": "lorne",
+   "name": "洛恩",
+   "duchy": "argyll",
+   "lon": -5.4,
+   "lat": 56.45,
+   "holder": "alba"
+  },
+  {
+   "id": "lochaber",
+   "name": "洛哈伯",
+   "duchy": "argyll",
+   "lon": -5.1,
+   "lat": 56.82,
+   "holder": "alba"
+  },
+  {
+   "id": "kintyre",
+   "name": "金泰尔",
+   "duchy": "argyll",
+   "lon": -5.6,
+   "lat": 55.5,
+   "holder": "alba"
+  },
+  {
+   "id": "applecross",
+   "name": "阿普尔克罗斯",
+   "duchy": "argyll",
+   "lon": -5.6,
+   "lat": 57.45,
+   "holder": "alba"
+  },
+  {
+   "id": "dumbarton",
+   "name": "邓巴顿",
+   "duchy": "strathclyde",
+   "lon": -4.57,
+   "lat": 55.94,
+   "holder": "strathclyde"
+  },
+  {
+   "id": "clydesdale",
+   "name": "克莱兹代尔",
+   "duchy": "strathclyde",
+   "lon": -3.78,
+   "lat": 55.67,
+   "holder": "strathclyde"
+  },
+  {
+   "id": "kyle",
+   "name": "凯尔",
+   "duchy": "strathclyde",
+   "lon": -4.55,
+   "lat": 55.45,
+   "holder": "strathclyde"
+  },
+  {
+   "id": "dumfries",
+   "name": "邓弗里斯",
+   "duchy": "strathclyde",
+   "lon": -3.61,
+   "lat": 55.07,
+   "holder": "strathclyde"
+  },
+  {
+   "id": "peebles",
+   "name": "皮布尔斯",
+   "duchy": "strathclyde",
+   "lon": -3.19,
+   "lat": 55.65,
+   "holder": "strathclyde"
+  },
+  {
+   "id": "wigtown",
+   "name": "威格敦",
+   "duchy": "galloway",
+   "lon": -4.6,
+   "lat": 54.87,
+   "holder": "galloway"
+  },
+  {
+   "id": "kirkcudbright",
+   "name": "柯尔库布里",
+   "duchy": "galloway",
+   "lon": -4.0,
+   "lat": 55.0,
+   "holder": "galloway"
+  },
+  {
+   "id": "lewis",
+   "name": "刘易斯岛",
+   "duchy": "isles",
+   "lon": -6.6,
+   "lat": 58.15,
+   "holder": "isles"
+  },
+  {
+   "id": "uist",
+   "name": "尤伊斯特",
+   "duchy": "isles",
+   "lon": -7.3,
+   "lat": 57.45,
+   "holder": "isles"
+  },
+  {
+   "id": "skye",
+   "name": "斯凯岛",
+   "duchy": "isles",
+   "lon": -6.2,
+   "lat": 57.35,
+   "holder": "isles"
+  },
+  {
+   "id": "mull",
+   "name": "马尔岛",
+   "duchy": "isles",
+   "lon": -5.95,
+   "lat": 56.45,
+   "holder": "isles"
+  },
+  {
+   "id": "islay",
+   "name": "艾雷岛",
+   "duchy": "isles",
+   "lon": -6.2,
+   "lat": 55.8,
+   "holder": "isles"
+  },
+  {
+   "id": "man",
+   "name": "马恩岛",
+   "duchy": "isles",
+   "lon": -4.55,
+   "lat": 54.23,
+   "holder": "man"
+  },
+  {
+   "id": "orkney",
+   "name": "奥克尼",
+   "duchy": "orkney",
+   "lon": -3.1,
+   "lat": 59.0,
+   "holder": "orkney"
+  },
+  {
+   "id": "shetland",
+   "name": "设得兰",
+   "duchy": "orkney",
+   "lon": -1.3,
+   "lat": 60.3,
+   "holder": "orkney"
+  },
+  {
+   "id": "aberffraw",
+   "name": "阿伯弗劳",
+   "duchy": "gwynedd",
+   "lon": -4.4,
+   "lat": 53.25,
+   "holder": "gwynedd"
+  },
+  {
+   "id": "arfon",
+   "name": "阿尔丰",
+   "duchy": "gwynedd",
+   "lon": -4.1,
+   "lat": 53.0,
+   "holder": "gwynedd"
+  },
+  {
+   "id": "rhos",
+   "name": "罗斯",
+   "duchy": "gwynedd",
+   "lon": -3.75,
+   "lat": 53.2,
+   "holder": "gwynedd"
+  },
+  {
+   "id": "meirionnydd",
+   "name": "梅里奥尼斯",
+   "duchy": "gwynedd",
+   "lon": -3.9,
+   "lat": 52.78,
+   "holder": "gwynedd"
+  },
+  {
+   "id": "tegeingl",
+   "name": "特盖恩格尔",
+   "duchy": "gwynedd",
+   "lon": -3.35,
+   "lat": 53.25,
+   "holder": "gwynedd"
+  },
+  {
+   "id": "mathrafal",
+   "name": "马斯拉法尔",
+   "duchy": "powys",
+   "lon": -3.33,
+   "lat": 52.68,
+   "holder": "gwynedd"
+  },
+  {
+   "id": "arwystli",
+   "name": "阿尔威斯特利",
+   "duchy": "powys",
+   "lon": -3.6,
+   "lat": 52.42,
+   "holder": "gwynedd"
+  },
+  {
+   "id": "maelor",
+   "name": "梅洛尔",
+   "duchy": "powys",
+   "lon": -3.0,
+   "lat": 52.98,
+   "holder": "gwynedd"
+  },
+  {
+   "id": "ceredigion",
+   "name": "锡尔迪金",
+   "duchy": "seisyllwg",
+   "lon": -4.05,
+   "lat": 52.25,
+   "holder": "seisyllwg"
+  },
+  {
+   "id": "ystrad_tywi",
+   "name": "伊斯特拉德图伊",
+   "duchy": "seisyllwg",
+   "lon": -4.0,
+   "lat": 51.9,
+   "holder": "seisyllwg"
+  },
+  {
+   "id": "dyfed",
+   "name": "德费德",
+   "duchy": "dyfed",
+   "lon": -5.0,
+   "lat": 51.85,
+   "holder": "dyfed"
+  },
+  {
+   "id": "brecon",
+   "name": "布雷肯",
+   "duchy": "brycheiniog",
+   "lon": -3.39,
+   "lat": 51.95,
+   "holder": "brycheiniog"
+  },
+  {
+   "id": "morgannwg",
+   "name": "摩根努格",
+   "duchy": "glywysing",
+   "lon": -3.3,
+   "lat": 51.55,
+   "holder": "glywysing"
+  },
+  {
+   "id": "gower",
+   "name": "高尔",
+   "duchy": "glywysing",
+   "lon": -3.95,
+   "lat": 51.65,
+   "holder": "glywysing"
+  },
+  {
+   "id": "gwent",
+   "name": "格温特",
+   "duchy": "gwent",
+   "lon": -2.85,
+   "lat": 51.7,
+   "holder": "gwent"
+  },
+  {
+   "id": "ergyng",
+   "name": "埃尔京",
+   "duchy": "gwent",
+   "lon": -2.9,
+   "lat": 51.95,
+   "holder": "gwent"
+  },
+  {
+   "id": "ailech",
+   "name": "艾莱赫",
+   "duchy": "ailech",
+   "lon": -7.4,
+   "lat": 55.0,
+   "holder": "ailech"
+  },
+  {
+   "id": "tir_eogain",
+   "name": "蒂龙",
+   "duchy": "ailech",
+   "lon": -6.9,
+   "lat": 54.55,
+   "holder": "ailech"
+  },
+  {
+   "id": "tir_chonaill",
+   "name": "蒂尔康奈尔",
+   "duchy": "ailech",
+   "lon": -8.1,
+   "lat": 54.8,
+   "holder": "ailech"
+  },
+  {
+   "id": "airgialla",
+   "name": "艾尔吉亚拉",
+   "duchy": "ailech",
+   "lon": -6.65,
+   "lat": 54.3,
+   "holder": "ailech"
+  },
+  {
+   "id": "downpatrick",
+   "name": "唐帕特里克",
+   "duchy": "ulaid",
+   "lon": -5.72,
+   "lat": 54.33,
+   "holder": "ulaid"
+  },
+  {
+   "id": "dal_araidi",
+   "name": "达尔纳莱德",
+   "duchy": "ulaid",
+   "lon": -6.2,
+   "lat": 54.8,
+   "holder": "ulaid"
+  },
+  {
+   "id": "uisneach",
+   "name": "乌斯内赫",
+   "duchy": "mide",
+   "lon": -7.4,
+   "lat": 53.5,
+   "holder": "mide"
+  },
+  {
+   "id": "brega",
+   "name": "布雷加",
+   "duchy": "mide",
+   "lon": -6.5,
+   "lat": 53.7,
+   "holder": "mide"
+  },
+  {
+   "id": "dublin",
+   "name": "都柏林",
+   "duchy": "leinster",
+   "lon": -6.26,
+   "lat": 53.35,
+   "holder": "dublin"
+  },
+  {
+   "id": "naas",
+   "name": "纳斯",
+   "duchy": "leinster",
+   "lon": -6.66,
+   "lat": 53.22,
+   "holder": "leinster"
+  },
+  {
+   "id": "ferns",
+   "name": "弗恩斯",
+   "duchy": "leinster",
+   "lon": -6.5,
+   "lat": 52.55,
+   "holder": "leinster"
+  },
+  {
+   "id": "ui_failge",
+   "name": "乌伊法尔吉",
+   "duchy": "leinster",
+   "lon": -7.5,
+   "lat": 53.25,
+   "holder": "leinster"
+  },
+  {
+   "id": "osraige",
+   "name": "奥索里",
+   "duchy": "osraige",
+   "lon": -7.25,
+   "lat": 52.65,
+   "holder": "osraige"
+  },
+  {
+   "id": "cashel",
+   "name": "卡舍尔",
+   "duchy": "munster",
+   "lon": -7.89,
+   "lat": 52.52,
+   "holder": "munster"
+  },
+  {
+   "id": "thomond",
+   "name": "托蒙德",
+   "duchy": "munster",
+   "lon": -8.8,
+   "lat": 52.85,
+   "holder": "munster"
+  },
+  {
+   "id": "desmond",
+   "name": "德斯蒙德",
+   "duchy": "munster",
+   "lon": -8.47,
+   "lat": 51.9,
+   "holder": "munster"
+  },
+  {
+   "id": "kerry",
+   "name": "凯里",
+   "duchy": "munster",
+   "lon": -9.7,
+   "lat": 52.15,
+   "holder": "munster"
+  },
+  {
+   "id": "deise",
+   "name": "德西",
+   "duchy": "munster",
+   "lon": -7.7,
+   "lat": 52.2,
+   "holder": "munster"
+  },
+  {
+   "id": "fidgenti",
+   "name": "菲金蒂",
+   "duchy": "munster",
+   "lon": -8.9,
+   "lat": 52.45,
+   "holder": "munster"
+  },
+  {
+   "id": "cruachan",
+   "name": "克鲁亨",
+   "duchy": "connacht",
+   "lon": -8.3,
+   "lat": 53.8,
+   "holder": "connacht"
+  },
+  {
+   "id": "ui_maine",
+   "name": "乌伊梅内",
+   "duchy": "connacht",
+   "lon": -8.22,
+   "lat": 53.33,
+   "holder": "connacht"
+  },
+  {
+   "id": "ui_fiachrach",
+   "name": "乌伊菲亚赫拉",
+   "duchy": "connacht",
+   "lon": -9.2,
+   "lat": 54.1,
+   "holder": "connacht"
+  },
+  {
+   "id": "breifne",
+   "name": "布雷夫内",
+   "duchy": "connacht",
+   "lon": -7.6,
+   "lat": 54.0,
+   "holder": "connacht"
+  },
+  {
+   "id": "iar_connacht",
+   "name": "西康诺特",
+   "duchy": "connacht",
+   "lon": -9.3,
+   "lat": 53.4,
+   "holder": "connacht"
+  }
+ ],
+ "realms": [
+  {
+   "id": "wessex",
+   "ruler": "埃塞尔雷德一世",
+   "names": null,
+   "title": "威塞克斯国王",
+   "color": "#b0352b"
+  },
+  {
+   "id": "mercia",
+   "ruler": "伯格雷德",
+   "names": null,
+   "title": "麦西亚国王",
+   "color": "#3d6a9c"
+  },
+  {
+   "id": "east_anglia",
+   "ruler": "埃德蒙",
+   "names": null,
+   "title": "东盎格利亚国王",
+   "color": "#d18b2c"
+  },
+  {
+   "id": "northumbria",
+   "ruler": "埃拉",
+   "names": null,
+   "title": "诺森布里亚国王",
+   "color": "#7a4d8c"
+  },
+  {
+   "id": "great_army",
+   "ruler": "无骨者伊瓦尔",
+   "names": null,
+   "title": "维京大军首领",
+   "color": "#4b4f57"
+  },
+  {
+   "id": "cornwall",
+   "ruler": "栋加斯",
+   "names": null,
+   "title": "康沃尔国王",
+   "color": "#6f7d3a"
+  },
+  {
+   "id": "alba",
+   "ruler": "康斯坦丁一世",
+   "names": null,
+   "title": "阿尔巴国王",
+   "color": "#2f7f8a"
+  },
+  {
+   "id": "strathclyde",
+   "ruler": "阿特加尔",
+   "names": null,
+   "title": "斯特拉斯克莱德国王",
+   "color": "#8c6a3d"
+  },
+  {
+   "id": "galloway",
+   "ruler": null,
+   "names": "norse_gael",
+   "title": "加洛韦领主",
+   "color": "#5d8c5a"
+  },
+  {
+   "id": "isles",
+   "ruler": "扁鼻子凯蒂尔",
+   "names": null,
+   "title": "群岛之王",
+   "color": "#56607a"
+  },
+  {
+   "id": "man",
+   "ruler": null,
+   "names": "norse_gael",
+   "title": "马恩岛首领",
+   "color": "#9c4f6b"
+  },
+  {
+   "id": "orkney",
+   "ruler": null,
+   "names": "norse",
+   "title": "奥克尼首领",
+   "color": "#6b6f8c"
+  },
+  {
+   "id": "gwynedd",
+   "ruler": "罗德里大王",
+   "names": null,
+   "title": "格温内斯和波伊斯国王",
+   "color": "#3f8c4a"
+  },
+  {
+   "id": "seisyllwg",
+   "ruler": "古贡",
+   "names": null,
+   "title": "塞瑟西尔格国王",
+   "color": "#b5a03a"
+  },
+  {
+   "id": "dyfed",
+   "ruler": "希瓦伊兹",
+   "names": null,
+   "title": "德费德国王",
+   "color": "#a8573a"
+  },
+  {
+   "id": "brycheiniog",
+   "ruler": null,
+   "names": "welsh",
+   "title": "布雷肯国王",
+   "color": "#7d5a8c"
+  },
+  {
+   "id": "glywysing",
+   "ruler": "休厄尔",
+   "names": null,
+   "title": "格利维辛国王",
+   "color": "#3a7d8c"
+  },
+  {
+   "id": "gwent",
+   "ruler": "梅里格",
+   "names": null,
+   "title": "格温特国王",
+   "color": "#8c3a5a"
+  },
+  {
+   "id": "ailech",
+   "ruler": "艾德·芬德利亚斯",
+   "names": null,
+   "title": "爱尔兰至尊王、艾莱赫国王",
+   "color": "#c8a24a"
+  },
+  {
+   "id": "ulaid",
+   "ruler": "莱斯洛巴尔",
+   "names": null,
+   "title": "乌莱德国王",
+   "color": "#4a8cc8"
+  },
+  {
+   "id": "mide",
+   "ruler": "唐哈德",
+   "names": null,
+   "title": "米斯国王",
+   "color": "#8cb04a"
+  },
+  {
+   "id": "dublin",
+   "ruler": "阿姆莱夫",
+   "names": null,
+   "title": "都柏林国王",
+   "color": "#3a3f4a"
+  },
+  {
+   "id": "leinster",
+   "ruler": "敦莱恩",
+   "names": null,
+   "title": "伦斯特国王",
+   "color": "#c84a4a"
+  },
+  {
+   "id": "osraige",
+   "ruler": "凯尔伯尔",
+   "names": null,
+   "title": "奥索里国王",
+   "color": "#4ac8a0"
+  },
+  {
+   "id": "munster",
+   "ruler": "肯·法拉德",
+   "names": null,
+   "title": "芒斯特国王",
+   "color": "#a04ac8"
+  },
+  {
+   "id": "connacht",
+   "ruler": "穆格隆",
+   "names": null,
+   "title": "康诺特国王",
+   "color": "#c87a4a"
+  }
+ ]
+}
