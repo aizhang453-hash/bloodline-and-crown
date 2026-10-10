@@ -1,6 +1,7 @@
 class_name Person
 extends RefCounted
-## 一个人: 名字、性别、生日、文化、长相基因, 还有性格特点、本事、健康、压力, 对别人的好感。
+## 一个人: 名字、性别、生日、文化、长相基因, 还有性格特点、本事、健康、压力, 对别人的好感;
+## 家人 (父母、配偶; 孩子和兄弟姐妹从父母推出来, 见 World)、家族、活着没有、威望。
 ## 本事、健康、好感都是现算的, 每样都能列出「哪一项加了多少」(鼠标指着时给人看)。
 
 const ADULT := 16
@@ -27,10 +28,19 @@ var traits: Array = []        # 性格和天生的特点 (traits.json 里的 id)
 var education := {}           # {skill, level}: 学的哪一样、第几档 (1 差 2 一般 3 好 4 出色)
 var base_skills := {}         # 本事的底子
 var stress := 0.0
+var father := ""              # 父亲的 id (不知道就是空的)
+var mother := ""
+var spouse := ""              # 配偶的 id (对方死了也还记着)
+var house := ""               # 家族 id (空 = 家族不详)
+var alive := true
+var death_day := -1           # 哪天死的
+var prestige := 0.0           # 威望
 
 
-## 在某一天几岁 (过了生日才算长一岁)
+## 在某一天几岁 (过了生日才算长一岁; 死了的人停在死的那年)
 func age(day: int) -> int:
+	if not alive:
+		day = mini(day, death_day)
 	return floori((day - birth_day) / float(GameDate.YEAR_DAYS))
 
 
@@ -136,6 +146,13 @@ func health_text(day: int) -> String:
 		if h < b[0]:
 			return b[1]
 	return "很好"
+
+
+# ---- 死 ----
+
+## 一年里死的机会 (按健康算: 很好、好一年 1–2%, 一般 3–5%, 差 8–15%, 很差 30% 左右)
+func yearly_death_chance(day: int) -> float:
+	return clampf(0.012 * exp(0.65 * (5.0 - health(day))), 0.003, 0.6)
 
 
 # ---- 好感 ----

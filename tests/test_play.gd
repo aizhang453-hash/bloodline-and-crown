@@ -39,7 +39,7 @@ func click_map(p: Vector2, button := MOUSE_BUTTON_LEFT) -> void:
 
 ## 点界面上的一个能点的地方 (按位置找; 跟 Godot 一样, 后加的在上面, 先接到点击)
 func click_hud(p: Vector2) -> bool:
-	var all: Array = hud._spots + hud._county_spots + hud._person_spots
+	var all: Array = hud._spots + hud._county_spots + hud._person_spots + hud._popup_spots
 	all.reverse()
 	for s in all:
 		if not s.visible or not Rect2(s.position, s.size).has_point(p):
@@ -238,3 +238,67 @@ func test_every_ruler_window_opens() -> void:
 		check(traits.size() >= 4, "%s 至少 3 个性格 + 教育" % world.ruler(id).name)
 	hud.close_person()
 	eq(hud._person_spots.size(), 0, "关了以后能指的地方清掉")
+
+
+func test_player_ruler_dies() -> void:
+	main.play_as("wessex")
+	main.clock.paused = false
+	var events := []
+	world.kill(world.ruler("wessex"), main.clock.day, events)
+	main.handle_events(events)
+	eq(hud.popup.get("kind", ""), "succession", "跳出国王去世的窗口")
+	check(main.clock.paused, "游戏暂停")
+	eq(hud.player, "wessex", "还是玩威塞克斯")
+	eq(world.ruler("wessex").name, "阿尔弗雷德", "现在是阿尔弗雷德")
+	key(KEY_SPACE)
+	check(hud.popup.is_empty(), "空格关上窗口")
+	check(main.clock.paused, "关窗口不会顺手让时间走")
+	eq(hud._player_face.texture, hud.face(world.ruler("wessex")), "左下角换成阿尔弗雷德的头像")
+
+
+func test_game_over_when_house_dies_out() -> void:
+	main.play_as("east_anglia")
+	var events := []
+	world.kill(world.ruler("east_anglia"), main.clock.day, events)
+	main.handle_events(events)
+	eq(hud.popup.get("kind", ""), "game_over", "埃德蒙没有家人, 游戏结束")
+	check(click_hud(Hud.POPUP_BUTTON.get_center()), "点「换一个国王接着玩」")
+	eq(hud.player, "", "可以重新选国王")
+	main._on_county_clicked(world.by_id.norwich.index)
+	check(click_hud(Vector2(280, 988)), "点「玩这个人」")
+	eq(hud.player, "east_anglia", "接着玩东盎格利亚的新国王")
+
+
+func test_other_kings_death_is_a_message() -> void:
+	main.play_as("wessex")
+	var events := []
+	world.kill(world.ruler("mercia"), main.clock.day, events)
+	main.handle_events(events)
+	check(hud.popup.is_empty(), "别国的事不跳窗口")
+	eq(hud._notes.size(), 1)
+	has_text(hud._notes[0][0], "伯格雷德")
+
+
+func test_partition_redraws_map() -> void:
+	main.play_as("gwynedd")
+	var events := []
+	world.kill(world.ruler("gwynedd"), main.clock.day, events)
+	main.handle_events(events)
+	var powys: String = world.people["gwriad"].realm
+	var c: Dictionary = world.by_id.mathrafal
+	eq(c.holder, powys)
+	var shown := map._lookup.get_pixel(c.index, 0)
+	var want: Color = world.realms[powys].color
+	check(absf(shown.r - want.r) + absf(shown.g - want.g) + absf(shown.b - want.b) < 0.02, "地图上波伊斯换了颜色")
+	eq(hud.player, "gwynedd", "玩家拿主要的王国")
+
+
+func test_family_row_and_heir_in_window() -> void:
+	main.play_as("gwynedd")
+	hud.show_person("ruler_gwynedd")
+	eq(hud._family.size(), Hud.FAMILY_MAX, "家人超过 8 个只显示 8 个")
+	eq(hud._family[0], "merfyn_frych", "第一个是父亲")
+	check(click_hud(Hud.CHAR_HEIR.get_center()), "点继承人")
+	eq(hud.person_id, "anarawd", "打开继承人安纳拉乌德")
+	check(click_hud(hud._family_rect(0).get_center()), "点家人的头像")
+	eq(hud.person_id, "ruler_gwynedd", "安纳拉乌德的第一个家人是父亲罗德里")

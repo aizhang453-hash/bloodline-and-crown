@@ -82,6 +82,21 @@ func _run() -> void:
 	await _shot("10_人物窗口_罗德里")
 	hud.show_person(w.realms.isles.ruler_id)
 	await _shot("11_人物窗口_凯蒂尔")
+
+	# 第 3 块: 罗德里去世, 儿子们分家 (右边出消息); 安纳拉乌德的人物窗口 (家人那一排); 你的国王去世
+	main.close_panel()
+	var events := []
+	w.kill(w.ruler("gwynedd"), main.clock.day, events)
+	main.handle_events(events)
+	map.focus(w.by_id.mathrafal.seat, 1.2)
+	await _shot("12_罗德里去世分家")
+	hud.show_person("anarawd")
+	await _shot("13_人物窗口_家人")
+	main.close_panel()
+	events = []
+	w.kill(w.ruler("wessex"), main.clock.day, events)
+	main.handle_events(events)
+	await _shot("14_你的国王去世")
 	quit()
 
 

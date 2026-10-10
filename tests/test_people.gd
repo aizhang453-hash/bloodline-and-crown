@@ -132,5 +132,5 @@ func test_world_rulers_have_traits_and_skills() -> void:
 			check(v >= 0 and v <= 40, "%s 的 %s 是 %d" % [p.name, s, v])
 	var p := w.ruler("wessex")
 	p.stress = 200.0
-	w.advance(365)
-	check(p.stress < 200.0, "过一年压力降了")
+	w.advance(30, w.start_day + 30)
+	check(p.stress < 200.0, "过一个月压力降了")

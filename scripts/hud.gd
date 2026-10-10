@@ -32,9 +32,17 @@ const CHAR_HEALTH := Rect2(24, 326, 512, 34)
 const CHAR_STRESS := Rect2(24, 366, 512, 34)
 const CHAR_TRAITS_Y := 500.0
 const CHAR_SKILLS_Y := 680.0
-const CHAR_OPINION := Rect2(24, 770, 512, 70)
-const CHAR_BUTTON := Rect2(40, 990, 480, 56)
+const CHAR_NAME := Rect2(276, 30, 240, 156)          # 名字这一块 (鼠标指着看史料说明)
+const CHAR_OPINION := Rect2(24, 766, 512, 40)
+const CHAR_HEIR := Rect2(24, 808, 512, 36)
+const FAMILY_Y := 884.0                              # 家人小头像那一排
+const FAMILY_FACE := Vector2(56, 65)
+const FAMILY_MAX := 8
+const CHAR_BUTTON := Rect2(40, 994, 480, 52)
 const BADGE := 60.0
+const POPUP := Rect2(560, 240, 800, 470)              # 国王去世的窗口 (画面正中)
+const POPUP_BUTTON := Rect2(780, 630, 360, 54)
+const NOTES := Rect2(1420, 58, 450, 34)               # 右边的消息, 一条一条往下排
 const BANNER := Rect2(560, 64, 800, 96)
 
 # 右边一列: [图标, 颜色, 名字, 第几块做]
@@ -74,6 +82,12 @@ var _player_face := TextureRect.new()
 var _county_face := TextureRect.new()
 var _person_face := TextureRect.new()
 var _person_spots: Array = []
+var _family: Array = []          # 人物窗口里家人那一排是谁 (人的 id)
+var _family_faces: Array = []    # 家人的小头像 (TextureRect)
+var popup := {}                  # 正中间的窗口 ({kind: "succession" / "game_over", event}), 空 = 没有
+var _popup_spots: Array = []
+var _popup_faces: Array = []
+var _notes: Array = []           # 右边的消息: [[文字, 还剩几秒], ...]
 var _stress_spot: Spot
 
 
@@ -96,6 +110,7 @@ func _ready() -> void:
 	_make_spots()
 	for face in [_player_face, _county_face, _person_face]:
 		face.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # 像素画放大不要糊
+		face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		face.stretch_mode = TextureRect.STRETCH_SCALE
 		face.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		face.visible = false
@@ -114,6 +129,61 @@ func _process(delta: float) -> void:
 	if _toast_time > 0.0:
 		_toast_time -= delta
 		_root.queue_redraw()
+	if not _notes.is_empty():
+		for n in _notes:
+			n[1] -= delta
+		_notes = _notes.filter(func(n: Array) -> bool: return n[1] > 0.0)
+		_root.queue_redraw()
+
+
+## 右边加一条消息 (别国的国王死了这类事), 12 秒后消失
+func notify(text: String) -> void:
+	_notes.push_front([text, 12.0])
+	if _notes.size() > 6:
+		_notes.resize(6)
+	_root.queue_redraw()
+
+
+## 正中间跳一个窗口 (你的国王死了)。窗口开着时点不到别的地方
+func show_popup(data: Dictionary) -> void:
+	close_popup()
+	popup = data
+	var e: Dictionary = data.event
+	_spot(Rect2(0, 0, 1920, 1080), "", Callable(), _popup_spots)
+	_spot(POPUP_BUTTON, "", close_popup, _popup_spots)
+	for i in 2:
+		var who: Person = world.people[e.dead if i == 0 else e.heir]
+		var tex := TextureRect.new()
+		tex.texture = face(who)
+		tex.stretch_mode = TextureRect.STRETCH_SCALE
+		tex.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tex.position = POPUP.position + (Vector2(40, 120) if i == 0 else Vector2(POPUP.size.x - 160, 120))
+		tex.size = Vector2(Portrait.W, Portrait.H)
+		if i == 0:
+			tex.modulate = Color(0.6, 0.6, 0.6)
+		_root.add_child(tex)
+		_popup_faces.append(tex)
+	redraw()
+
+
+func close_popup() -> void:
+	if popup.is_empty():
+		return
+	var game_over: bool = popup.kind == "game_over"
+	popup = {}
+	for s in _popup_spots + _popup_faces:
+		if _hover_spot == s:
+			_hover_spot = null
+		s.queue_free()
+	_popup_spots.clear()
+	_popup_faces.clear()
+	if game_over:
+		# 家族绝嗣: 游戏结束, 可以换一个国王接着玩
+		player = ""
+		close_person()
+		toast("在地图上点一块领地, 换一个国王接着玩")
+	redraw()
 
 
 func redraw() -> void:
@@ -190,6 +260,10 @@ func close_person() -> void:
 
 func _drop_person() -> void:
 	person_id = ""
+	for f in _family_faces:
+		f.queue_free()
+	_family_faces.clear()
+	_family.clear()
 	for s in _person_spots:
 		s.queue_free()
 		if _hover_spot == s:
@@ -299,7 +373,17 @@ func _make_person_spots() -> void:
 	var day := clock.day
 	_spot(SIDE_PANEL, "", Callable(), _person_spots)
 	_spot(Rect2(SIDE_PANEL.end.x - 52, 14, 38, 38), "关上 (Esc)", close_requested.emit, _person_spots)
-	_spot(CHAR_HEALTH, _parts_text("健康: %s (%.1f)" % [p.health_text(day), p.health(day)], p.health_parts(day), true), Callable(), _person_spots)
+	var about := [p.name, "%s · %s" % [p.culture_name(), world.house_name(p.house)]]
+	if world.houses.has(p.house):
+		about.append(world.houses[p.house].desc)
+	if p.note != "":
+		about.append("——")
+		about.append("说明: " + p.note)
+	_spot(CHAR_NAME, "\n".join(about), Callable(), _person_spots)
+	if not p.alive:
+		_spot(CHAR_HEALTH, "%s已经去世了" % p.name, Callable(), _person_spots)
+	else:
+		_spot(CHAR_HEALTH, _parts_text("健康: %s (%.1f)\n一年里死的机会大约 %.1f%%" % [p.health_text(day), p.health(day), p.yearly_death_chance(day) * 100.0], p.health_parts(day), true), Callable(), _person_spots)
 	_spot(CHAR_STRESS, "压力 %d (第 %d 档)\n做违背自己性格的事会涨, 每年自己降 %d%s。\n100 点一档; 到了一档会崩溃出事 (崩溃的事件第 8 块才有)。" % [
 			int(p.stress), p.stress_level(), int(Person.STRESS_DECAY * (2 if p.has_trait("calm") else 1)), " (冷静的人降两倍)" if p.has_trait("calm") else ""],
 			Callable(), _person_spots)
@@ -313,7 +397,52 @@ func _make_person_spots() -> void:
 	if player != "" and world.realms[player].ruler_id != p.id:
 		var o := p.opinion_of(world.ruler(player))
 		_spot(CHAR_OPINION, _parts_text("他对你的好感: %+d" % o.total, o.parts, false), Callable(), _person_spots)
+	if p.alive and p.realm != "":
+		var law := Succession.law_of(world.realms[p.realm].culture)
+		var h := world.heir(p.realm, day)
+		var tip := "%s: %s" % [Succession.NAMES[law], Succession.DESCS[law]]
+		if h:
+			tip = "继承人: %s\n%s\n(点一下看他)" % [h.name, tip]
+			_spot(CHAR_HEIR, tip, show_person.bind(h.id), _person_spots)
+		else:
+			_spot(CHAR_HEIR, "家族里没有能继承的男人! 他死了家族就丢了这个国家\n" + tip, Callable(), _person_spots)
+	_make_family(p)
 	_spot(CHAR_BUTTON, "", _focus_person_realm, _person_spots)
+
+
+## 家人那一排: 父母、配偶、孩子、兄弟姐妹 (最多 8 个), 每个一张小头像, 点了看那个人
+func _make_family(p: Person) -> void:
+	var list := []
+	for id in [p.father, p.mother, p.spouse]:
+		if id != "" and world.people.has(id):
+			list.append(world.people[id])
+	list.append_array(world.children_of(p))
+	list.append_array(world.siblings_of(p))
+	for i in mini(list.size(), FAMILY_MAX):
+		var f: Person = list[i]
+		_family.append(f.id)
+		var r := _family_rect(i)
+		var tex := TextureRect.new()
+		tex.texture = face(f)
+		tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE  # 不然图不肯比原来小
+		tex.stretch_mode = TextureRect.STRETCH_SCALE
+		tex.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tex.position = r.position
+		tex.size = r.size
+		if not f.alive:
+			tex.modulate = Color(0.55, 0.55, 0.55)
+		_root.add_child(tex)
+		_family_faces.append(tex)
+		var state := ("%d 岁" % f.age(clock.day)) if f.alive else ("已故, 享年 %d 岁" % f.age(clock.day))
+		_spot(r, "%s: %s (%s)\n(点一下看这个人)" % [world.relation(p, f), f.name, state], show_person.bind(f.id), _person_spots)
+	if list.size() > FAMILY_MAX:
+		var rest := list.slice(FAMILY_MAX).map(func(f: Person) -> String: return "%s: %s" % [world.relation(p, f), f.name])
+		_spot(Rect2(_family_rect(FAMILY_MAX - 1).end.x + 4, FAMILY_Y, 40, FAMILY_FACE.y), "还有:\n" + "\n".join(rest), Callable(), _person_spots)
+
+
+func _family_rect(i: int) -> Rect2:
+	return Rect2(Vector2(30 + i * 62, FAMILY_Y), FAMILY_FACE)
 
 
 func _focus_person_realm() -> void:
@@ -409,6 +538,8 @@ func _toggle_help() -> void:
 
 
 func _toggle_pause() -> void:
+	if not popup.is_empty():
+		return
 	if player == "":
 		toast("先在地图上点一块领地, 选一个国王来玩")
 		return
@@ -488,8 +619,11 @@ class Root:
 			_county_panel()
 		if hud.show_help:
 			_help()
+		_notifications()
 		_map_tooltip()
 		_toast()
+		if not hud.popup.is_empty():
+			_popup()
 
 	# ---- 右上角 ----
 	func _top_bar() -> void:
@@ -506,11 +640,16 @@ class Root:
 				draw_line(Vector2(x - 6, 8), Vector2(x - 6, 38), Color(Look.GOLD_DIM, 0.5), 1.0)
 			draw_circle(Vector2(x + 18, 22), 15, Color(0.12, 0.12, 0.13))
 			Icons.draw(self, res[0], Vector2(x + 18, 22), 24, Color(res[1]))
-			if hud.player == "":
+			if hud.player == "" or not hud.world.realms.has(hud.player):
 				Look.text(self, Vector2(x + 40, 28), "—", 20, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
 			else:
-				Look.text(self, Vector2(x + 40, 24), "0", 20, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
-				Look.text(self, Vector2(x + 40, 40), "+0.0", 13, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+				var value := "0"
+				var gain := "+0.0"
+				if res[2] == "威望":
+					value = str(int(hud.world.ruler(hud.player).prestige))
+					gain = "+1.0"
+				Look.text(self, Vector2(x + 40, 24), value, 20, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+				Look.text(self, Vector2(x + 40, 40), gain, 13, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
 
 	# ---- 右边一列 ----
 	func _right_menu() -> void:
@@ -658,14 +797,21 @@ class Root:
 			Look.text(self, Vector2(286, 110), realm.title, 18, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, 250, "sans")
 		var born: int = GameDate.from_day(p.birth_day)[0]
 		# 9 世纪的人生年都只是「约」, 史料记的也是大概的年份
-		Look.text(self, Vector2(286, 144), "%d 岁 (约 %d 年生)" % [p.age(day), born], 18, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
-		Look.text(self, Vector2(286, 174), p.culture_name(), 18, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+		if p.alive:
+			Look.text(self, Vector2(286, 144), "%d 岁 (约 %d 年生)" % [p.age(day), born], 18, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+		else:
+			Look.text(self, Vector2(286, 144), "已故 · 享年 %d 岁 (%d 年)" % [p.age(day), GameDate.from_day(p.death_day)[0]], 18, Look.RED, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+		Look.text(self, Vector2(286, 174), "%s · %s" % [p.culture_name(), w.house_name(p.house)], 17, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, 250, "sans")
 		if not realm.is_empty():
 			Icons.realm_arms(self, Rect2(286, 196, 56, 66), realm)
 			Look.text(self, Vector2(354, 236), w.realm_name(p.realm), 20, Look.TEXT)
+		elif w.houses.has(p.house):
+			var hs: Dictionary = w.houses[p.house]
+			Icons.arms(self, Rect2(286, 196, 56, 66), int(hs.design) % Icons.DESIGNS, hs.color, Icons.charge_color(hs.color, int(hs.design)))
+			Look.text(self, Vector2(354, 236), hs.name, 20, Look.TEXT)
 		# 健康、压力
 		Look.text(self, CHAR_HEALTH.position + Vector2(8, 25), "健康", 20, Look.GOLD)
-		var ht := p.health_text(day)
+		var ht := p.health_text(day) if p.alive else "已故"
 		var hcol := Look.GREEN if ht in ["好", "很好"] else (Look.RED if ht in ["差", "很差"] else Look.TEXT)
 		Look.text(self, CHAR_HEALTH.position + Vector2(80, 25), ht, 20, hcol, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
 		Look.text(self, CHAR_STRESS.position + Vector2(8, 25), "压力", 20, Look.GOLD)
@@ -696,20 +842,44 @@ class Root:
 			if hot(sr):
 				draw_rect(sr.grow(3), Look.GOLD, false, 2.0)
 		# 对你的好感
-		draw_line(Vector2(30, 760), Vector2(r.size.x - 30, 760), Color(Look.GOLD_DIM, 0.5), 1.0)
+		draw_line(Vector2(30, 758), Vector2(r.size.x - 30, 758), Color(Look.GOLD_DIM, 0.5), 1.0)
+		var oy := CHAR_OPINION.position.y + 29
 		if hud.player == "":
-			Look.text(self, Vector2(32, 806), "(选好国王以后, 这里显示他对你的好感)", 17, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
-		elif w.realms[hud.player].ruler_id == p.id:
-			Look.text(self, Vector2(32, 806), "这就是你", 22, Look.GREEN)
-		else:
+			Look.text(self, Vector2(32, oy), "(选好国王以后, 这里显示他对你的好感)", 16, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+		elif w.realms.has(hud.player) and w.realms[hud.player].ruler_id == p.id:
+			Look.text(self, Vector2(32, oy), "这就是你", 20, Look.GREEN)
+		elif p.alive and w.realms.has(hud.player):
 			var o := p.opinion_of(w.ruler(hud.player))
-			Look.text(self, Vector2(32, 806), "他对你的好感", 20, Look.GOLD)
+			Look.text(self, Vector2(32, oy), "他对你的好感", 19, Look.GOLD)
 			var ocol := Look.GREEN if o.total > 0 else (Look.RED if o.total < 0 else Look.TEXT)
-			Look.text(self, Vector2(200, 808), "%+d" % o.total, 28, ocol)
-			Look.text(self, Vector2(280, 806), "(鼠标指着看为什么)", 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
-		# 史料说明
-		if p.note != "":
-			draw_multiline_string(Look.font("sans"), Vector2(32, 880), "说明: " + p.note, HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 64, 16, 4, Look.TEXT_DIM)
+			Look.text(self, Vector2(190, oy + 2), "%+d" % o.total, 26, ocol)
+			Look.text(self, Vector2(270, oy), "(鼠标指着看为什么)", 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+		# 继承人
+		if p.alive and p.realm != "":
+			var law := Succession.law_of(w.realms[p.realm].culture)
+			var h := w.heir(p.realm, day)
+			var hy := CHAR_HEIR.position.y + 25
+			Look.text(self, Vector2(32, hy), "继承人", 19, Look.GOLD)
+			if h:
+				var rel := w.relation(p, h)
+				Look.text(self, Vector2(110, hy), "%s (%s%d 岁)" % [h.name, (rel + ", ") if rel != "" else "", h.age(day)], 19, Look.TEXT if not hot(CHAR_HEIR) else Look.GOLD, HORIZONTAL_ALIGNMENT_LEFT, 300, "sans")
+			else:
+				Look.text(self, Vector2(110, hy), "没有! 家族里没有能继承的男人", 18, Look.RED, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+			Look.text(self, Vector2(430, hy), Succession.NAMES[law], 16, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+		# 家人
+		draw_line(Vector2(30, 852), Vector2(r.size.x - 30, 852), Color(Look.GOLD_DIM, 0.5), 1.0)
+		Look.text(self, Vector2(32, 876), "家人", 19, Look.GOLD)
+		if hud._family.is_empty():
+			Look.text(self, Vector2(90, 876), "(史料里没有记载)", 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+		for i in hud._family.size():
+			var fr := hud._family_rect(i)
+			draw_rect(fr, Color(0.12, 0.12, 0.13))
+			draw_rect(fr.grow(1), Look.GOLD if hot(fr) else Look.GOLD_DIM, false, 1.0)
+			var f: Person = w.people[hud._family[i]]
+			Look.text_center(self, Rect2(fr.position.x - 4, fr.end.y + 2, fr.size.x + 8, 18), w.relation(p, f), 13, Look.TEXT_DIM if f.alive else Color(Look.TEXT_DIM, 0.5), "sans")
+		var total := 3 + w.children_of(p).size() + w.siblings_of(p).size()
+		if hud._family.size() == FAMILY_MAX and total > FAMILY_MAX:
+			Look.text(self, Vector2(hud._family_rect(FAMILY_MAX - 1).end.x + 8, FAMILY_Y + 38), "…", 22, Look.TEXT_DIM)
 		if p.realm != "":
 			_wide_button(CHAR_BUTTON, "看看整个%s" % w.realm_name(p.realm), false)
 
@@ -818,6 +988,56 @@ class Root:
 		Look.panel(self, r, Color(0.06, 0.065, 0.075, 0.95))
 		Look.text(self, r.position + Vector2(14, 30), lines[0], 22, Look.TEXT)
 		Look.text(self, r.position + Vector2(14, 58), lines[1], 16, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 28, "sans")
+
+	# ---- 右边的消息 ----
+	func _notifications() -> void:
+		var y := NOTES.position.y
+		var f := Look.font("sans")
+		for n in hud._notes:
+			var a := clampf(float(n[1]), 0.0, 1.0)
+			var lines := 1 if f.get_string_size(n[0], HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x < NOTES.size.x - 24 else 2
+			var r := Rect2(NOTES.position.x, y, NOTES.size.x, NOTES.size.y + (lines - 1) * 20)
+			draw_rect(r, Color(0.06, 0.065, 0.075, 0.9 * a))
+			draw_rect(r, Color(Look.GOLD_DIM, a), false, 1.5)
+			draw_multiline_string(f, r.position + Vector2(12, 23), n[0], HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 24, 15, 2, Color(Look.TEXT, a))
+			y += r.size.y + 6
+
+	# ---- 正中间的窗口: 你的国王去世了 ----
+	func _popup() -> void:
+		draw_rect(Rect2(0, 0, 1920, 1080), Color(0, 0, 0, 0.45))
+		var w := hud.world
+		var e: Dictionary = hud.popup.event
+		var dead: Person = w.people[e.dead]
+		var heir: Person = w.people[e.heir]
+		var r := POPUP
+		Look.panel(self, r, Color(0.07, 0.075, 0.09, 1.0))
+		draw_rect(Rect2(r.position, Vector2(r.size.x, 84)), Color(0.25, 0.12, 0.1, 0.6))
+		var over: bool = hud.popup.kind == "game_over"
+		Look.text_center(self, Rect2(r.position.x, r.position.y + 14, r.size.x, 56), "你的家族绝嗣了" if over else "%s去世了" % dead.name, 36, Look.GOLD)
+		for i in 2:
+			var fr := Rect2(r.position + (Vector2(40, 120) if i == 0 else Vector2(r.size.x - 160, 120)), Vector2(Portrait.W, Portrait.H))
+			draw_rect(fr.grow(2), Look.GOLD_DIM, false, 2.0)
+			Look.text_center(self, Rect2(fr.position.x - 30, fr.end.y + 6, fr.size.x + 60, 24), dead.name if i == 0 else heir.name, 18, Look.TEXT_DIM if i == 0 else Look.TEXT, "sans")
+		var lines := []
+		var law: String = Succession.NAMES[e.law]
+		if over:
+			lines.append("%s去世了, 享年 %d 岁。" % [dead.name, dead.age(e.day)])
+			lines.append("%s里没有能继承的男人了。" % w.house_name(dead.house))
+			lines.append("%s的贵族推举了%s当新国王。" % [e.realm_name, heir.name])
+			lines.append("游戏结束。你可以换一个国王接着玩。")
+		else:
+			var rel := w.relation(dead, heir)
+			lines.append("享年 %d 岁。" % dead.age(e.day))
+			lines.append("照%s, 由他的%s%s继承%s。" % [law, rel if rel != "" else "族人", heir.name, e.realm_name])
+			for sp in e.splits:
+				var son: Person = w.people[sp[1]]
+				lines.append("%s%s分到了%s, 成了那里的国王。" % [w.relation(dead, son), son.name, w.realm_name(sp[0])])
+			if e.merged_into != "":
+				lines.append("%s本来就是%s的国王, 两个国家归到了他一个人手里。" % [heir.name, w.realm_name(e.merged_into)])
+			lines.append("你现在是%s (%d 岁)。" % [heir.name, heir.age(e.day)])
+		for i in lines.size():
+			Look.text_center(self, Rect2(r.position.x + 180, r.position.y + 130 + i * 40, r.size.x - 360, 34), lines[i], 19, Look.TEXT, "sans")
+		_wide_button(POPUP_BUTTON, "换一个国王接着玩" if over else "继续", true)
 
 	func _toast() -> void:
 		if hud._toast_time <= 0.0:

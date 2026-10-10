@@ -29,7 +29,7 @@ func test_random_play() -> void:
 			0, 1:
 				_click_map(map, p)
 			2:
-				var all: Array = hud._spots + hud._county_spots + hud._person_spots
+				var all: Array = hud._spots + hud._county_spots + hud._person_spots + hud._popup_spots
 				all.reverse()
 				for s in all:
 					if s.visible and Rect2(s.position, s.size).has_point(p):

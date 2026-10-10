@@ -1,5 +1,5 @@
 {
- "说明": "867 年 1 月 1 日的不列颠群岛。爵位: 帝国 > 王国 > 公国 > 领地 (伯爵领)。holder 是开局时这块领地归哪个国家。ruler 为 null 的国家开局时随机生成统治者 (用 culture 那种文化的名字)。born 是统治者的生年, born_estimated 为 true 是史料没记、估计的。looks 是史料里讲到的长相 (盖过随机的长相基因)。 personality 是史料里能看出来的性格 (不够 3 个随机补), base_skills 是史料里看得出擅长的本事 (底子 8 = 中上, 10 = 高); 都写在 note 里。",
+ "说明": "867 年 1 月 1 日的不列颠群岛。爵位: 帝国 > 王国 > 公国 > 领地 (伯爵领)。holder 是开局时这块领地归哪个国家。ruler 为 null 的国家开局时随机生成统治者 (用 culture 那种文化的名字)。born 是统治者的生年, born_estimated 为 true 是史料没记、估计的。looks 是史料里讲到的长相 (盖过随机的长相基因)。 personality 是史料里能看出来的性格 (不够 3 个随机补), base_skills 是史料里看得出擅长的本事 (底子 8 = 中上, 10 = 高); 都写在 note 里。 house 是家族 (houses 里有名字); titles 是手里的几个公国一级头衔 (平分继承时分给儿子们)。family 是开局有记载的家人 (born 生年估计, died 卒年, 有 died 的开局已经去世, 用来连起家谱)。",
  "start_date": [
   867,
   1,
@@ -1252,7 +1252,16 @@
    ],
    "base_skills": {
     "martial": 8
-   }
+   },
+   "house": "cerdicing",
+   "titles": [
+    "wessex",
+    "kent",
+    "sussex",
+    "essex"
+   ],
+   "father": "aethelwulf",
+   "mother": "osburh"
   },
   {
    "id": "mercia",
@@ -1268,7 +1277,13 @@
    ],
    "base_skills": {
     "diplomacy": 8
-   }
+   },
+   "house": "burgred",
+   "titles": [
+    "mercia",
+    "hwicce",
+    "lindsey"
+   ]
   },
   {
    "id": "east_anglia",
@@ -1282,7 +1297,8 @@
    "personality": [
     "zealous",
     "brave"
-   ]
+   ],
+   "house": "edmund"
   },
   {
    "id": "northumbria",
@@ -1296,6 +1312,12 @@
    "personality": [
     "ambitious",
     "sadistic"
+   ],
+   "house": "aella",
+   "titles": [
+    "bernicia",
+    "deira",
+    "lothian"
    ]
   },
   {
@@ -1314,7 +1336,9 @@
    "base_skills": {
     "martial": 10,
     "intrigue": 10
-   }
+   },
+   "house": "lodbrok",
+   "father": "ragnar"
   },
   {
    "id": "cornwall",
@@ -1327,7 +1351,8 @@
    "note": "生年不详, 估计 (康沃尔人说布立吞语, 跟威尔士人近, 头像先借威尔士的样子) 虔信: 康沃尔的「栋加斯国王石」上刻着他请人为他的灵魂祈祷。",
    "personality": [
     "zealous"
-   ]
+   ],
+   "house": "dungarth"
   },
   {
    "id": "alba",
@@ -1343,7 +1368,14 @@
    ],
    "base_skills": {
     "martial": 8
-   }
+   },
+   "house": "alpin",
+   "titles": [
+    "gowrie",
+    "moray",
+    "argyll"
+   ],
+   "father": "cinaed"
   },
   {
    "id": "strathclyde",
@@ -1353,7 +1385,9 @@
    "culture": "cumbric",
    "born": 820,
    "born_estimated": true,
-   "note": "生年不详, 估计 (斯特拉斯克莱德人说坎布里亚语 (布立吞语的一支), 头像先借威尔士的样子)"
+   "note": "生年不详, 估计 (斯特拉斯克莱德人说坎布里亚语 (布立吞语的一支), 头像先借威尔士的样子)",
+   "house": "dyfnwal",
+   "father": "dyfnwal"
   },
   {
    "id": "galloway",
@@ -1376,7 +1410,9 @@
    },
    "personality": [
     "ambitious"
-   ]
+   ],
+   "house": "ketill",
+   "father": "bjorn_grimsson"
   },
   {
    "id": "man",
@@ -1407,7 +1443,13 @@
    "base_skills": {
     "martial": 10,
     "diplomacy": 10
-   }
+   },
+   "house": "merfyn",
+   "titles": [
+    "gwynedd",
+    "powys"
+   ],
+   "father": "merfyn_frych"
   },
   {
    "id": "seisyllwg",
@@ -1417,7 +1459,9 @@
    "culture": "welsh",
    "born": 815,
    "born_estimated": true,
-   "note": "生年不详, 估计"
+   "note": "生年不详, 估计",
+   "house": "seisyll",
+   "father": "meurig_dyfnwallon"
   },
   {
    "id": "dyfed",
@@ -1431,7 +1475,8 @@
    "personality": [
     "greedy",
     "arbitrary"
-   ]
+   ],
+   "house": "bleddri"
   },
   {
    "id": "brycheiniog",
@@ -1441,7 +1486,8 @@
    "culture": "welsh",
    "born": 840,
    "born_estimated": true,
-   "note": "880 年代还在位, 按这个估"
+   "note": "880 年代还在位, 按这个估",
+   "house": "tewdwr"
   },
   {
    "id": "glywysing",
@@ -1454,7 +1500,9 @@
    "note": "生年不详, 估计 虔信: 兰特威特梅杰教堂里的石十字架是他为父亲的灵魂立的。",
    "personality": [
     "zealous"
-   ]
+   ],
+   "house": "rhys",
+   "father": "rhys_glywysing"
   },
   {
    "id": "gwent",
@@ -1464,7 +1512,8 @@
    "culture": "welsh",
    "born": 820,
    "born_estimated": true,
-   "note": "849 年当王, 按这个估"
+   "note": "849 年当王, 按这个估",
+   "house": "arthfael"
   },
   {
    "id": "ailech",
@@ -1484,7 +1533,9 @@
    "base_skills": {
     "martial": 10,
     "diplomacy": 8
-   }
+   },
+   "house": "cenel_neogain",
+   "father": "niall_caille"
   },
   {
    "id": "ulaid",
@@ -1494,7 +1545,8 @@
    "culture": "gaelic",
    "born": 805,
    "born_estimated": true,
-   "note": "857 年当王, 873 年死, 估计"
+   "note": "857 年当王, 873 年死, 估计",
+   "house": "dal_naraidi"
   },
   {
    "id": "mide",
@@ -1504,7 +1556,8 @@
    "culture": "gaelic",
    "born": 830,
    "born_estimated": true,
-   "note": "生年不详, 估计"
+   "note": "生年不详, 估计",
+   "house": "clann_cholmain"
   },
   {
    "id": "dublin",
@@ -1524,7 +1577,9 @@
    ],
    "base_skills": {
     "martial": 10
-   }
+   },
+   "house": "gofraid",
+   "father": "gofraid"
   },
   {
    "id": "leinster",
@@ -1534,7 +1589,8 @@
    "culture": "gaelic",
    "born": 825,
    "born_estimated": true,
-   "note": "生年不详, 估计"
+   "note": "生年不详, 估计",
+   "house": "ui_dunlainge"
   },
   {
    "id": "osraige",
@@ -1553,7 +1609,9 @@
     "martial": 10,
     "diplomacy": 10,
     "intrigue": 10
-   }
+   },
+   "house": "dunlaing",
+   "father": "dungal"
   },
   {
    "id": "munster",
@@ -1563,7 +1621,8 @@
    "culture": "gaelic",
    "born": 820,
    "born_estimated": true,
-   "note": "生年不详, 估计"
+   "note": "生年不详, 估计",
+   "house": "eoganacht_aine"
   },
   {
    "id": "connacht",
@@ -1573,7 +1632,771 @@
    "culture": "gaelic",
    "born": 815,
    "born_estimated": true,
-   "note": "848 年当王, 估计"
+   "note": "848 年当王, 估计",
+   "house": "ui_briuin"
+  }
+ ],
+ "houses": [
+  {
+   "id": "cerdicing",
+   "name": "塞尔迪克家族",
+   "desc": "威塞克斯王族, 自称是传说中的开国国王塞尔迪克的后代"
+  },
+  {
+   "id": "oslac",
+   "name": "奥斯莱克家族",
+   "desc": "阿尔弗雷德的母亲奥斯伯的娘家"
+  },
+  {
+   "id": "burgred",
+   "name": "伯格雷德家族",
+   "desc": "麦西亚国王伯格雷德的家族 (祖上不详)"
+  },
+  {
+   "id": "edmund",
+   "name": "埃德蒙家族",
+   "desc": "东盎格利亚国王埃德蒙的家族 (祖上不详)"
+  },
+  {
+   "id": "aella",
+   "name": "埃拉家族",
+   "desc": "编年史说埃拉不是王族出身"
+  },
+  {
+   "id": "lodbrok",
+   "name": "洛德布罗克家族",
+   "desc": "传说中朗纳尔·洛德布罗克的儿子们"
+  },
+  {
+   "id": "dungarth",
+   "name": "栋加斯家族",
+   "desc": "康沃尔国王栋加斯的家族 (祖上不详)"
+  },
+  {
+   "id": "alpin",
+   "name": "阿尔平家族",
+   "desc": "阿尔巴开国国王基纳德·麦克·阿尔平的家族"
+  },
+  {
+   "id": "dyfnwal",
+   "name": "迪夫瓦尔家族",
+   "desc": "斯特拉斯克莱德王族"
+  },
+  {
+   "id": "ketill",
+   "name": "凯蒂尔家族",
+   "desc": "扁鼻子凯蒂尔的家族 (冰岛萨迦)"
+  },
+  {
+   "id": "gofraid",
+   "name": "戈夫赖德家族",
+   "desc": "《爱尔兰残篇编年史》说阿姆莱夫的父亲是「洛赫兰国王」戈夫赖德"
+  },
+  {
+   "id": "merfyn",
+   "name": "梅尔芬家族",
+   "desc": "格温内斯王族, 罗德里的父亲梅尔芬·弗里赫开的头"
+  },
+  {
+   "id": "seisyll",
+   "name": "塞瑟西尔家族",
+   "desc": "塞瑟西尔格王族"
+  },
+  {
+   "id": "bleddri",
+   "name": "布莱兹里家族",
+   "desc": "德费德国王希瓦伊兹的家族"
+  },
+  {
+   "id": "tewdwr",
+   "name": "泰乌多尔家族",
+   "desc": "布雷肯王族"
+  },
+  {
+   "id": "rhys",
+   "name": "里斯家族",
+   "desc": "格利维辛国王休厄尔的家族"
+  },
+  {
+   "id": "arthfael",
+   "name": "阿斯瓦伊尔家族",
+   "desc": "格温特国王梅里格的家族"
+  },
+  {
+   "id": "cenel_neogain",
+   "name": "北乌伊尼尔家族",
+   "desc": "北方的乌伊尼尔 (塞内尔·内奥甘), 出过很多至尊王"
+  },
+  {
+   "id": "dunlaing",
+   "name": "敦莱恩家族",
+   "desc": "奥索里王族"
+  },
+  {
+   "id": "clann_cholmain",
+   "name": "科尔曼家族",
+   "desc": "米斯的乌伊尼尔 (克兰·科尔曼), 也出过很多至尊王"
+  },
+  {
+   "id": "eoganacht_aine",
+   "name": "艾恩家族",
+   "desc": "芒斯特的欧格纳赫特·艾恩一支"
+  },
+  {
+   "id": "ui_briuin",
+   "name": "乌伊布里恩家族",
+   "desc": "康诺特王族"
+  },
+  {
+   "id": "ui_dunlainge",
+   "name": "乌伊敦莱恩家族",
+   "desc": "伦斯特王族"
+  },
+  {
+   "id": "dal_naraidi",
+   "name": "达尔纳莱德家族",
+   "desc": "乌莱德的达尔纳莱德王族"
+  }
+ ],
+ "family": [
+  {
+   "id": "aethelwulf",
+   "name": "埃塞尔伍尔夫",
+   "female": false,
+   "born": 795,
+   "house": "cerdicing",
+   "culture": "anglo_saxon",
+   "note": "威塞克斯国王, 858 年去世。他的安排: 几个儿子里活得最久的那个继承全部家产",
+   "died": 858
+  },
+  {
+   "id": "osburh",
+   "name": "奥斯伯",
+   "female": true,
+   "born": 810,
+   "house": "oslac",
+   "culture": "anglo_saxon",
+   "note": "阿尔弗雷德的母亲, 856 年以前去世",
+   "died": 855,
+   "spouse": "aethelwulf"
+  },
+  {
+   "id": "wulfthryth",
+   "name": "伍尔夫思里斯",
+   "female": true,
+   "born": 848,
+   "house": "",
+   "culture": "anglo_saxon",
+   "note": "868 年的文书上叫她「王后伍尔夫思里斯」, 娘家不详",
+   "spouse": "ruler_wessex"
+  },
+  {
+   "id": "aethelhelm",
+   "name": "埃塞尔赫尔姆",
+   "female": false,
+   "born": 865,
+   "house": "cerdicing",
+   "culture": "anglo_saxon",
+   "note": "史料只说 871 年时还是小孩, 生年估计",
+   "father": "ruler_wessex",
+   "mother": "wulfthryth"
+  },
+  {
+   "id": "aethelwold",
+   "name": "埃塞尔沃尔德",
+   "female": false,
+   "born": 866,
+   "house": "cerdicing",
+   "culture": "anglo_saxon",
+   "note": "史料只说 871 年时还是小孩, 生年估计",
+   "father": "ruler_wessex",
+   "mother": "wulfthryth"
+  },
+  {
+   "id": "alfred",
+   "name": "阿尔弗雷德",
+   "female": false,
+   "born": 849,
+   "house": "cerdicing",
+   "culture": "anglo_saxon",
+   "note": "约 848–849 年生。阿瑟写他「比哥哥们都好看」",
+   "father": "aethelwulf",
+   "mother": "osburh"
+  },
+  {
+   "id": "aethelswith",
+   "name": "埃塞尔斯维斯",
+   "female": true,
+   "born": 838,
+   "house": "cerdicing",
+   "culture": "anglo_saxon",
+   "note": "853 年嫁给麦西亚国王伯格雷德",
+   "father": "aethelwulf",
+   "mother": "osburh",
+   "spouse": "ruler_mercia"
+  },
+  {
+   "id": "ragnar",
+   "name": "朗纳尔·洛德布罗克",
+   "female": false,
+   "born": 795,
+   "house": "lodbrok",
+   "culture": "norse",
+   "note": "传说人物。萨迦说他被诺森布里亚国王埃拉扔进蛇坑, 儿子们为了报仇打到英格兰",
+   "died": 865
+  },
+  {
+   "id": "halfdan",
+   "name": "哈夫丹",
+   "female": false,
+   "born": 832,
+   "house": "lodbrok",
+   "culture": "norse",
+   "note": "编年史说他是伊瓦尔的兄弟; 后来当了约克国王",
+   "father": "ragnar"
+  },
+  {
+   "id": "ubba",
+   "name": "乌巴",
+   "female": false,
+   "born": 838,
+   "house": "lodbrok",
+   "culture": "norse",
+   "note": "圣人传记说他和伊瓦尔一起杀了埃德蒙",
+   "father": "ragnar"
+  },
+  {
+   "id": "cinaed",
+   "name": "基纳德·麦克·阿尔平",
+   "female": false,
+   "born": 810,
+   "house": "alpin",
+   "culture": "gaelic",
+   "note": "阿尔巴开国国王, 858 年去世, 继位的是他弟弟 (推举继承)",
+   "died": 858
+  },
+  {
+   "id": "aed_alba",
+   "name": "艾德",
+   "female": false,
+   "born": 840,
+   "house": "alpin",
+   "culture": "gaelic",
+   "note": "康斯坦丁的弟弟, 后来当了阿尔巴国王 (877–878)",
+   "father": "cinaed"
+  },
+  {
+   "id": "mael_muire",
+   "name": "梅尔穆雷",
+   "female": true,
+   "born": 848,
+   "house": "alpin",
+   "culture": "gaelic",
+   "note": "后来嫁给至尊王艾德·芬德利亚斯",
+   "father": "cinaed"
+  },
+  {
+   "id": "alba_daughter",
+   "name": null,
+   "female": true,
+   "born": 844,
+   "house": "alpin",
+   "culture": "gaelic",
+   "note": "基纳德的女儿, 嫁给斯特拉斯克莱德的鲁恩。史料没留下她的名字, 名字是随机的",
+   "father": "cinaed",
+   "spouse": "rhun"
+  },
+  {
+   "id": "domnall_alba",
+   "name": "多姆纳尔",
+   "female": false,
+   "born": 862,
+   "house": "alpin",
+   "culture": "gaelic",
+   "note": "康斯坦丁的儿子, 后来当了阿尔巴国王 (889–900); 母亲不详",
+   "father": "ruler_alba"
+  },
+  {
+   "id": "dyfnwal",
+   "name": "迪夫瓦尔",
+   "female": false,
+   "born": 790,
+   "house": "dyfnwal",
+   "culture": "cumbric",
+   "note": "阿特加尔的父亲",
+   "died": 850
+  },
+  {
+   "id": "rhun",
+   "name": "鲁恩",
+   "female": false,
+   "born": 840,
+   "house": "dyfnwal",
+   "culture": "cumbric",
+   "note": "阿特加尔的儿子, 后来当了斯特拉斯克莱德国王 (872–878)",
+   "father": "ruler_strathclyde",
+   "spouse": "alba_daughter"
+  },
+  {
+   "id": "eochaid",
+   "name": "约海德",
+   "female": false,
+   "born": 862,
+   "house": "dyfnwal",
+   "culture": "cumbric",
+   "note": "鲁恩的儿子, 后来当了斯特拉斯克莱德国王",
+   "father": "rhun",
+   "mother": "alba_daughter"
+  },
+  {
+   "id": "bjorn_grimsson",
+   "name": "比约恩·格里姆松",
+   "female": false,
+   "born": 780,
+   "house": "ketill",
+   "culture": "norse",
+   "note": "凯蒂尔的父亲 (萨迦)",
+   "died": 850
+  },
+  {
+   "id": "yngvild",
+   "name": "英格维尔德",
+   "female": true,
+   "born": 810,
+   "house": "",
+   "culture": "norse",
+   "note": "凯蒂尔的妻子, 「公羊」凯蒂尔的女儿 (萨迦)",
+   "spouse": "ruler_isles"
+  },
+  {
+   "id": "bjorn_ketilsson",
+   "name": "比约恩",
+   "female": false,
+   "born": 835,
+   "house": "ketill",
+   "culture": "norse",
+   "note": "人称「东方人」比约恩, 后来去了冰岛 (萨迦)",
+   "father": "ruler_isles",
+   "mother": "yngvild"
+  },
+  {
+   "id": "helgi",
+   "name": "赫尔吉",
+   "female": false,
+   "born": 838,
+   "house": "ketill",
+   "culture": "norse",
+   "note": "人称「比奥兰」, 后来去了冰岛 (萨迦)",
+   "father": "ruler_isles",
+   "mother": "yngvild"
+  },
+  {
+   "id": "aud",
+   "name": "奥德",
+   "female": true,
+   "born": 834,
+   "house": "ketill",
+   "culture": "norse",
+   "note": "人称「深思的」奥德, 嫁给都柏林国王 (萨迦)。爱尔兰年鉴另有说法",
+   "father": "ruler_isles",
+   "mother": "yngvild",
+   "spouse": "ruler_dublin"
+  },
+  {
+   "id": "thorunn",
+   "name": "托伦",
+   "female": true,
+   "born": 840,
+   "house": "ketill",
+   "culture": "norse",
+   "note": "后来嫁给「瘦子」赫尔吉 (萨迦)",
+   "father": "ruler_isles",
+   "mother": "yngvild"
+  },
+  {
+   "id": "jorunn",
+   "name": "约伦",
+   "female": true,
+   "born": 842,
+   "house": "ketill",
+   "culture": "norse",
+   "note": "人称「聪明的」约伦 (萨迦)",
+   "father": "ruler_isles",
+   "mother": "yngvild"
+  },
+  {
+   "id": "gofraid",
+   "name": "戈夫赖德",
+   "female": false,
+   "born": 795,
+   "house": "gofraid",
+   "culture": "norse_gael",
+   "note": "《爱尔兰残篇编年史》说他是「洛赫兰国王」, 阿姆莱夫的父亲",
+   "died": 860
+  },
+  {
+   "id": "auisle",
+   "name": "奥伊斯勒",
+   "female": false,
+   "born": 835,
+   "house": "gofraid",
+   "culture": "norse_gael",
+   "note": "阿姆莱夫的弟弟。年鉴说他 867 年被自家人杀了",
+   "father": "gofraid"
+  },
+  {
+   "id": "carlus",
+   "name": "卡卢斯",
+   "female": false,
+   "born": 848,
+   "house": "gofraid",
+   "culture": "norse_gael",
+   "note": "阿姆莱夫的儿子 (爱尔兰年鉴), 母亲不详",
+   "father": "ruler_dublin"
+  },
+  {
+   "id": "oistin",
+   "name": "奥伊斯廷",
+   "female": false,
+   "born": 850,
+   "house": "gofraid",
+   "culture": "norse_gael",
+   "note": "阿姆莱夫的儿子 (爱尔兰年鉴), 母亲不详",
+   "father": "ruler_dublin"
+  },
+  {
+   "id": "thorstein",
+   "name": "红发托尔斯坦",
+   "female": false,
+   "born": 855,
+   "house": "gofraid",
+   "culture": "norse_gael",
+   "note": "萨迦里奥德的儿子, 后来打下了苏格兰北部一大片",
+   "father": "ruler_dublin",
+   "mother": "aud"
+  },
+  {
+   "id": "merfyn_frych",
+   "name": "梅尔芬·弗里赫",
+   "female": false,
+   "born": 790,
+   "house": "merfyn",
+   "culture": "welsh",
+   "note": "罗德里的父亲, 外号「有雀斑的」",
+   "died": 844
+  },
+  {
+   "id": "meurig_dyfnwallon",
+   "name": "梅里格·阿普·迪夫瓦隆",
+   "female": false,
+   "born": 790,
+   "house": "seisyll",
+   "culture": "welsh",
+   "note": "古贡和安加拉德的父亲",
+   "died": 845
+  },
+  {
+   "id": "angharad",
+   "name": "安加拉德",
+   "female": true,
+   "born": 825,
+   "house": "seisyll",
+   "culture": "welsh",
+   "note": "罗德里的妻子, 塞瑟西尔格国王古贡的妹妹 (史料只说是姐妹, 谁大谁小不清楚; 按估计的生年她小)",
+   "father": "meurig_dyfnwallon",
+   "spouse": "ruler_gwynedd"
+  },
+  {
+   "id": "anarawd",
+   "name": "安纳拉乌德",
+   "female": false,
+   "born": 849,
+   "house": "merfyn",
+   "culture": "welsh",
+   "note": "后来当了格温内斯国王",
+   "father": "ruler_gwynedd",
+   "mother": "angharad"
+  },
+  {
+   "id": "gwriad",
+   "name": "格里亚德",
+   "female": false,
+   "born": 850,
+   "house": "merfyn",
+   "culture": "welsh",
+   "note": "历史上 878 年跟父亲一起战死",
+   "father": "ruler_gwynedd",
+   "mother": "angharad"
+  },
+  {
+   "id": "cadell",
+   "name": "卡德尔",
+   "female": false,
+   "born": 852,
+   "house": "merfyn",
+   "culture": "welsh",
+   "note": "后来拿下了塞瑟西尔格和德费德",
+   "father": "ruler_gwynedd",
+   "mother": "angharad"
+  },
+  {
+   "id": "merfyn_ap_rhodri",
+   "name": "梅尔芬",
+   "female": false,
+   "born": 854,
+   "house": "merfyn",
+   "culture": "welsh",
+   "note": "后世家谱里罗德里的儿子",
+   "father": "ruler_gwynedd",
+   "mother": "angharad"
+  },
+  {
+   "id": "tudwal",
+   "name": "图德瓦尔",
+   "female": false,
+   "born": 856,
+   "house": "merfyn",
+   "culture": "welsh",
+   "note": "人称「瘸子」图德瓦尔, 打仗时被打瘸了",
+   "father": "ruler_gwynedd",
+   "mother": "angharad"
+  },
+  {
+   "id": "meurig_ap_rhodri",
+   "name": "梅里格",
+   "female": false,
+   "born": 858,
+   "house": "merfyn",
+   "culture": "welsh",
+   "note": "后世家谱里罗德里的儿子",
+   "father": "ruler_gwynedd",
+   "mother": "angharad"
+  },
+  {
+   "id": "gwyddelig",
+   "name": "圭泽利格",
+   "female": false,
+   "born": 860,
+   "house": "merfyn",
+   "culture": "welsh",
+   "note": "后世家谱里罗德里的儿子",
+   "father": "ruler_gwynedd",
+   "mother": "angharad"
+  },
+  {
+   "id": "llywarch",
+   "name": "利瓦尔赫",
+   "female": false,
+   "born": 855,
+   "house": "bleddri",
+   "culture": "welsh",
+   "note": "希瓦伊兹的儿子, 后来当了德费德国王",
+   "father": "ruler_dyfed"
+  },
+  {
+   "id": "rhodri_dyfed",
+   "name": "罗德里",
+   "female": false,
+   "born": 858,
+   "house": "bleddri",
+   "culture": "welsh",
+   "note": "希瓦伊兹的儿子",
+   "father": "ruler_dyfed"
+  },
+  {
+   "id": "rhys_glywysing",
+   "name": "里斯",
+   "female": false,
+   "born": 790,
+   "house": "rhys",
+   "culture": "welsh",
+   "note": "休厄尔的父亲, 休厄尔为他的灵魂立了石十字架",
+   "died": 840
+  },
+  {
+   "id": "arthfael",
+   "name": "阿斯瓦伊尔",
+   "female": false,
+   "born": 855,
+   "house": "rhys",
+   "culture": "welsh",
+   "note": "休厄尔的儿子",
+   "father": "ruler_glywysing"
+  },
+  {
+   "id": "owain_g",
+   "name": "欧温",
+   "female": false,
+   "born": 860,
+   "house": "rhys",
+   "culture": "welsh",
+   "note": "休厄尔的儿子",
+   "father": "ruler_glywysing"
+  },
+  {
+   "id": "nest_g",
+   "name": "内斯特",
+   "female": true,
+   "born": 862,
+   "house": "rhys",
+   "culture": "welsh",
+   "note": "休厄尔的女儿",
+   "father": "ruler_glywysing"
+  },
+  {
+   "id": "ermithridd",
+   "name": "埃尔米斯里兹",
+   "female": true,
+   "born": 864,
+   "house": "rhys",
+   "culture": "welsh",
+   "note": "休厄尔的女儿",
+   "father": "ruler_glywysing"
+  },
+  {
+   "id": "brochfael",
+   "name": "布罗赫瓦伊尔",
+   "female": false,
+   "born": 845,
+   "house": "arthfael",
+   "culture": "welsh",
+   "note": "梅里格的儿子, 后来向阿尔弗雷德称臣",
+   "father": "ruler_gwent"
+  },
+  {
+   "id": "ffernfael",
+   "name": "弗恩瓦伊尔",
+   "female": false,
+   "born": 848,
+   "house": "arthfael",
+   "culture": "welsh",
+   "note": "梅里格的儿子, 后来向阿尔弗雷德称臣",
+   "father": "ruler_gwent"
+  },
+  {
+   "id": "niall_caille",
+   "name": "尼尔·卡耶",
+   "female": false,
+   "born": 790,
+   "house": "cenel_neogain",
+   "culture": "gaelic",
+   "note": "艾德·芬德利亚斯的父亲, 当过至尊王",
+   "died": 846
+  },
+  {
+   "id": "dungal",
+   "name": "敦加尔",
+   "female": false,
+   "born": 790,
+   "house": "dunlaing",
+   "culture": "gaelic",
+   "note": "凯尔伯尔和兰的父亲",
+   "died": 842
+  },
+  {
+   "id": "land",
+   "name": "兰",
+   "female": true,
+   "born": 830,
+   "house": "dunlaing",
+   "culture": "gaelic",
+   "note": "凯尔伯尔的妹妹, 先嫁给前一任至尊王, 后来嫁给艾德",
+   "father": "dungal",
+   "spouse": "ruler_ailech"
+  },
+  {
+   "id": "domnall_ailech",
+   "name": "多姆纳尔",
+   "female": false,
+   "born": 850,
+   "house": "cenel_neogain",
+   "culture": "gaelic",
+   "note": "艾德的儿子 (母亲是他的第一个妻子)",
+   "father": "ruler_ailech"
+  },
+  {
+   "id": "mael_duin",
+   "name": "梅尔敦",
+   "female": false,
+   "born": 845,
+   "house": "cenel_neogain",
+   "culture": "gaelic",
+   "note": "替父亲管艾莱赫, 年鉴说他 867 年早死",
+   "father": "ruler_ailech"
+  },
+  {
+   "id": "eithne_ailech",
+   "name": "埃斯尼",
+   "female": true,
+   "born": 855,
+   "house": "cenel_neogain",
+   "culture": "gaelic",
+   "note": "艾德的女儿, 后来嫁给至尊王弗兰",
+   "father": "ruler_ailech"
+  },
+  {
+   "id": "riagan",
+   "name": "里亚甘",
+   "female": false,
+   "born": 825,
+   "house": "dunlaing",
+   "culture": "gaelic",
+   "note": "凯尔伯尔的弟弟, 后来继承奥索里",
+   "father": "dungal"
+  },
+  {
+   "id": "mael_felbha",
+   "name": "梅尔费尔瓦",
+   "female": true,
+   "born": 830,
+   "house": "clann_cholmain",
+   "culture": "gaelic",
+   "note": "凯尔伯尔的妻子, 前一任至尊王的女儿",
+   "spouse": "ruler_osraige"
+  },
+  {
+   "id": "diarmait",
+   "name": "迪亚尔迈特",
+   "female": false,
+   "born": 850,
+   "house": "dunlaing",
+   "culture": "gaelic",
+   "note": "凯尔伯尔的儿子, 后来当了奥索里国王",
+   "father": "ruler_osraige",
+   "mother": "mael_felbha"
+  },
+  {
+   "id": "cellach",
+   "name": "凯拉赫",
+   "female": false,
+   "born": 852,
+   "house": "dunlaing",
+   "culture": "gaelic",
+   "note": "凯尔伯尔的儿子",
+   "father": "ruler_osraige",
+   "mother": "mael_felbha"
+  },
+  {
+   "id": "gormlaith_o",
+   "name": "格尔姆莱斯",
+   "female": true,
+   "born": 855,
+   "house": "dunlaing",
+   "culture": "gaelic",
+   "note": "凯尔伯尔的女儿",
+   "father": "ruler_osraige",
+   "mother": "mael_felbha"
+  },
+  {
+   "id": "eithne_o",
+   "name": "埃斯尼",
+   "female": true,
+   "born": 858,
+   "house": "dunlaing",
+   "culture": "gaelic",
+   "note": "凯尔伯尔的女儿, 萨迦说后来嫁给奥克尼伯爵",
+   "father": "ruler_osraige",
+   "mother": "mael_felbha"
   }
  ]
 }

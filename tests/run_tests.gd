@@ -24,7 +24,12 @@ func _run_all() -> void:
 	for file in files:
 		if not (file.begins_with("test_") and file.ends_with(".gd")) or file == "test_case.gd":
 			continue
+		var load_errors := errors.messages.size()
 		var script: GDScript = load(here + "/" + file)
+		if script == null or not script.can_instantiate() or errors.messages.size() > load_errors:
+			failures.append("%s: 读不进来 (脚本写错了) %s" % [file, " ".join(errors.messages.slice(load_errors))])
+			print("%s: 读不进来!" % file)
+			continue
 		var methods := []
 		for m in script.get_script_method_list():
 			if String(m.name).begins_with("test_") and not methods.has(m.name):
