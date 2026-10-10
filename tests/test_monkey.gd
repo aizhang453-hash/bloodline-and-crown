@@ -29,9 +29,12 @@ func test_random_play() -> void:
 			0, 1:
 				_click_map(map, p)
 			2:
-				for s in hud._spots + hud._county_spots:
-					if s.visible and s.on_click.is_valid() and Rect2(s.position, s.size).has_point(p):
-						s.on_click.call()
+				var all: Array = hud._spots + hud._county_spots + hud._person_spots
+				all.reverse()
+				for s in all:
+					if s.visible and Rect2(s.position, s.size).has_point(p):
+						if s.on_click.is_valid():
+							s.on_click.call()
 						break
 			3:
 				var ev := InputEventKey.new()

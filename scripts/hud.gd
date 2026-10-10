@@ -24,6 +24,17 @@ const MODE_BIG := Vector2(1773, 969)
 const MODE_SMALL := [Vector2(1817, 965), Vector2(1854, 965), Vector2(1887, 965),
 		Vector2(1806, 1000), Vector2(1837, 1000), Vector2(1867, 1000), Vector2(1897, 1000)]
 const SIDE_PANEL := Rect2(0, 0, 560, 1080)           # 点了领地以后左边的窗口 (跟三代的人物、领地窗口一样宽)
+const NAME_PLATE := Rect2(52, 766, 240, 32)          # 头像框上面写名字的小牌子
+const PANEL_FACE := Rect2(36, 168, 120, 140)         # 领地窗口里主人的头像 (原大)
+# 人物窗口 (点头像打开, 跟领地窗口一样在左边)
+const CHAR_FACE := Rect2(24, 24, 240, 280)
+const CHAR_HEALTH := Rect2(24, 326, 512, 34)
+const CHAR_STRESS := Rect2(24, 366, 512, 34)
+const CHAR_TRAITS_Y := 500.0
+const CHAR_SKILLS_Y := 680.0
+const CHAR_OPINION := Rect2(24, 770, 512, 70)
+const CHAR_BUTTON := Rect2(40, 990, 480, 56)
+const BADGE := 60.0
 const BANNER := Rect2(560, 64, 800, 96)
 
 # 右边一列: [图标, 颜色, 名字, 第几块做]
@@ -47,6 +58,7 @@ var clock: Clock
 var map: MapView
 var player := ""       # 玩家的国家, 没选之前是空的
 var county := 0        # 左边窗口在看的领地, 0 = 没开
+var person_id := ""    # 左边人物窗口在看的人, 空 = 没开
 var hover_index := 0   # 鼠标指着的地图上的领地
 var show_help := false
 
@@ -56,6 +68,13 @@ var _hover_spot: Control
 var _county_spots: Array = []
 var _toast := ""
 var _toast_time := 0.0
+var _faces := {}                     # 画好的头像: "人的 id 几岁" -> 图
+var _back := Control.new()           # 最底下一层: 头像框的底色和左下角的头像 (按钮要画在头像上面)
+var _player_face := TextureRect.new()
+var _county_face := TextureRect.new()
+var _person_face := TextureRect.new()
+var _person_spots: Array = []
+var _stress_spot: Spot
 
 
 func _init(p_world: World, p_clock: Clock, p_map: MapView) -> void:
@@ -69,8 +88,26 @@ func _ready() -> void:
 	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.theme = _make_theme()
+	_back.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_back.draw.connect(func() -> void: _back.draw_colored_polygon(_root.arch(), Color(0.06, 0.065, 0.075, 0.9)))
+	add_child(_back)
 	add_child(_root)
 	_make_spots()
+	for face in [_player_face, _county_face, _person_face]:
+		face.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # 像素画放大不要糊
+		face.stretch_mode = TextureRect.STRETCH_SCALE
+		face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		face.visible = false
+	_back.add_child(_player_face)
+	_root.add_child(_county_face)  # 领地窗口、人物窗口里的头像在窗口上面
+	_root.add_child(_person_face)
+	_person_face.position = CHAR_FACE.position
+	_person_face.size = CHAR_FACE.size
+	_player_face.position = PORTRAIT.position
+	_player_face.size = PORTRAIT.size
+	_county_face.position = PANEL_FACE.position
+	_county_face.size = PANEL_FACE.size
 
 
 func _process(delta: float) -> void:
@@ -80,7 +117,32 @@ func _process(delta: float) -> void:
 
 
 func redraw() -> void:
+	_sync_faces()
 	_root.queue_redraw()
+
+
+## 某个人现在的头像 (同一个人同一个岁数只画一次)
+func face(p: Person) -> Texture2D:
+	var key := "%s %d" % [p.id, p.age(clock.day)]
+	if not _faces.has(key):
+		_faces[key] = ImageTexture.create_from_image(Portrait.make(p.looks(clock.day)))
+	return _faces[key]
+
+
+## 头像跟着玩家、开着的窗口换 (左边窗口开着时盖住左下角的头像, 跟三代一样)
+func _sync_faces() -> void:
+	_player_face.visible = player != "" and county == 0 and person_id == ""
+	if _player_face.visible:
+		_player_face.texture = face(world.ruler(player))
+	_county_face.visible = county != 0
+	if _county_face.visible:
+		_county_face.texture = face(world.ruler(world.county_at(county).holder))
+	if player != "" and _stress_spot:
+		var me := world.ruler(player)
+		_stress_spot.tooltip_text = "你的压力: %d (第 %d 档)\n100 点一档, 最多三档。做违背性格的事会涨, 每年自己降一些。\n(点一下看你的人物窗口)" % [int(me.stress), me.stress_level()]
+	_person_face.visible = person_id != ""
+	if _person_face.visible:
+		_person_face.texture = face(world.people[person_id])
 
 
 func toast(text: String) -> void:
@@ -94,18 +156,45 @@ func later(name: String, block: int) -> void:
 
 
 func show_county(index: int) -> void:
+	_drop_person()
 	county = index
 	show_help = false
 	for s in _county_spots:
 		s.visible = true
-	_root.queue_redraw()
+	redraw()
 
 
 func close_county() -> void:
 	county = 0
 	for s in _county_spots:
 		s.visible = false
-	_root.queue_redraw()
+	redraw()
+
+
+## 打开人物窗口 (领地窗口会关上, 跟三代一样左边只有一个窗口)
+func show_person(id: String) -> void:
+	county = 0
+	for s in _county_spots:
+		s.visible = false
+	_drop_person()
+	person_id = id
+	show_help = false
+	_make_person_spots()
+	redraw()
+
+
+func close_person() -> void:
+	_drop_person()
+	redraw()
+
+
+func _drop_person() -> void:
+	person_id = ""
+	for s in _person_spots:
+		s.queue_free()
+		if _hover_spot == s:
+			_hover_spot = null
+	_person_spots.clear()
 
 
 func set_map_hover(index: int) -> void:
@@ -115,7 +204,7 @@ func set_map_hover(index: int) -> void:
 
 func set_player(realm_id: String) -> void:
 	player = realm_id
-	_root.queue_redraw()
+	redraw()
 
 
 # ---- 能点的地方 (看不见的方块, 管鼠标指着的说明和点击) ----
@@ -146,7 +235,7 @@ func _make_spots() -> void:
 		var m: Array = MENU[i]
 		_spot(Rect2(1878, RIGHT_MENU_Y[i] - 20, 42, 40), m[2], later.bind(m[2], m[3]))
 	# 左下角
-	_spot(PORTRAIT, "", Callable())
+	_spot(PORTRAIT, "你的国王 (点一下看他的人物窗口)", _open_player)
 	var squares := [["生活重点", 12], ["信仰", 13], ["文化", 14]]
 	for i in 3:
 		_spot(Rect2(0, LEFT_SQUARES_Y[i] - 20, 45, 40), "你的" + squares[i][0], later.bind(squares[i][0], squares[i][1]))
@@ -155,7 +244,10 @@ func _make_spots() -> void:
 	for i in 4:
 		var c: Vector2 = BOTTOM_ROW[i][0]
 		var r: float = BOTTOM_ROW[i][1]
-		_spot(Rect2(c - Vector2(r, r), Vector2(r, r) * 2), bottom[i][0], later.bind(bottom[i][0], bottom[i][1]))
+		if i == 1:
+			_stress_spot = _spot(Rect2(c - Vector2(r, r), Vector2(r * 2 + 62, r * 2)), "压力", _open_player)
+		else:
+			_spot(Rect2(c - Vector2(r, r), Vector2(r, r) * 2), bottom[i][0], later.bind(bottom[i][0], bottom[i][1]))
 	# 右下角: 日期和速度
 	_spot(DATE_BAR, "", Callable())
 	_spot(Rect2(1330, 1042, 34, 36), "菜单 (存档、设置、退出)", _menu)
@@ -176,6 +268,7 @@ func _make_spots() -> void:
 		_spot(Rect2(MODE_SMALL[i + 3] - Vector2(13, 13), Vector2(26, 26)), "地图模式: " + later_modes[i][0], later.bind("地图模式: " + later_modes[i][0], later_modes[i][1]))
 	# 左边的领地窗口 (开着的时候才有)
 	_spot(SIDE_PANEL, "", Callable(), _county_spots)
+	_spot(PANEL_FACE, "点一下看这个人", _open_holder, _county_spots)
 	_spot(Rect2(SIDE_PANEL.end.x - 52, 14, 38, 38), "关上 (Esc)", close_requested.emit, _county_spots)
 	_spot(Rect2(40, 960, 480, 56), "", _play_this, _county_spots)
 	_spot(Rect2(40, 890, 480, 50), "", _focus_holder, _county_spots)
@@ -188,6 +281,103 @@ func _focus_player() -> void:
 		toast("先选一个国王")
 		return
 	_focus_realm(player)
+
+
+func _open_player() -> void:
+	if player != "":
+		show_person(world.realms[player].ruler_id)
+
+
+func _open_holder() -> void:
+	if county:
+		show_person(world.realms[world.county_at(county).holder].ruler_id)
+
+
+## 人物窗口里能指、能点的地方 (每个人的特点不一样, 打开时现做)
+func _make_person_spots() -> void:
+	var p: Person = world.people[person_id]
+	var day := clock.day
+	_spot(SIDE_PANEL, "", Callable(), _person_spots)
+	_spot(Rect2(SIDE_PANEL.end.x - 52, 14, 38, 38), "关上 (Esc)", close_requested.emit, _person_spots)
+	_spot(CHAR_HEALTH, _parts_text("健康: %s (%.1f)" % [p.health_text(day), p.health(day)], p.health_parts(day), true), Callable(), _person_spots)
+	_spot(CHAR_STRESS, "压力 %d (第 %d 档)\n做违背自己性格的事会涨, 每年自己降 %d%s。\n100 点一档; 到了一档会崩溃出事 (崩溃的事件第 8 块才有)。" % [
+			int(p.stress), p.stress_level(), int(Person.STRESS_DECAY * (2 if p.has_trait("calm") else 1)), " (冷静的人降两倍)" if p.has_trait("calm") else ""],
+			Callable(), _person_spots)
+	var badges := _person_badges(p)
+	for i in badges.size():
+		_spot(_badge_rect(i), _trait_tip(badges[i]), Callable(), _person_spots)
+	for i in Traits.SKILLS.size():
+		var sk: String = Traits.SKILLS[i]
+		var info := Traits.skill_info(sk)
+		_spot(_skill_rect(i), _parts_text("%s %d\n%s" % [info.name, p.skill(sk, day), info.desc], p.skill_parts(sk, day), false), Callable(), _person_spots)
+	if player != "" and world.realms[player].ruler_id != p.id:
+		var o := p.opinion_of(world.ruler(player))
+		_spot(CHAR_OPINION, _parts_text("他对你的好感: %+d" % o.total, o.parts, false), Callable(), _person_spots)
+	_spot(CHAR_BUTTON, "", _focus_person_realm, _person_spots)
+
+
+func _focus_person_realm() -> void:
+	var p: Person = world.people[person_id]
+	if p.realm != "":
+		_focus_realm(p.realm)
+
+
+## 一个人身上的特点牌子: 先性格, 再天生的, 最后教育
+func _person_badges(p: Person) -> Array:
+	var list: Array = p.personality() + p.congenital()
+	if not p.education.is_empty():
+		list.append(p.education)
+	return list
+
+
+func _badge_rect(i: int) -> Rect2:
+	var c := Vector2(58 + (i % 7) * 74, CHAR_TRAITS_Y + (i / 7) * 74)
+	return Rect2(c - Vector2(BADGE, BADGE) / 2, Vector2(BADGE, BADGE))
+
+
+func _skill_rect(i: int) -> Rect2:
+	var c := Vector2(66 + i * 85, CHAR_SKILLS_Y)
+	return Rect2(c - Vector2(28, 28), Vector2(56, 84))
+
+
+func _trait_tip(what: Variant) -> String:
+	if what is Dictionary:
+		var name := Traits.education_name(what)
+		var desc := ""
+		for t in Traits.data().education.tracks:
+			if t.skill == what.skill:
+				desc = t.desc
+		return "%s\n%s\n%s +%d" % [name, desc, Traits.skill_info(what.skill).name, Traits.education_bonus(int(what.level))]
+	var info := Traits.get_trait(what)
+	var lines := [info.name, info.desc]
+	var effects := []
+	for sk in info.get("skills", {}):
+		var v := int(info.skills[sk])
+		effects.append("%s %+d" % ["六项本事" if sk == "all" else Traits.skill_info(sk).name, v])
+	if info.has("health"):
+		effects.append("健康 %+.2f" % float(info.health))
+	if info.has("opinion"):
+		effects.append("别人对他的好感 %+d" % int(info.opinion))
+	if not effects.is_empty():
+		lines.append("  ".join(effects))
+	if info.get("kind", "") == "personality":
+		var opp := []
+		for o in info.get("opposite", []):
+			opp.append("「%s」" % Traits.get_trait(o).name)
+		lines.append("跟同样%s的人合得来%s" % ["「" + info.name + "」", ("; 跟" + "、".join(opp) + "的人合不来") if not opp.is_empty() else ""])
+	elif info.get("kind", "") == "congenital":
+		lines.append("天生的 (以后会遗传给孩子)")
+	return "\n".join(lines)
+
+
+## 「标题 + 每一项加了多少」的说明
+func _parts_text(title: String, parts: Array, decimal: bool) -> String:
+	var lines := [title, "——"]
+	for x in parts:
+		lines.append(("%s  %+.1f" if decimal else "%s  %+d") % [x[0], x[1]])
+	if parts.is_empty():
+		lines.append("(没有加减)")
+	return "\n".join(lines)
 
 
 func _focus_holder() -> void:
@@ -292,6 +482,8 @@ class Root:
 		_date_bar()
 		if hud.player == "":
 			_banner()
+		if hud.person_id != "":
+			_person_panel()
 		if hud.county:
 			_county_panel()
 		if hud.show_help:
@@ -336,27 +528,31 @@ class Root:
 				draw_rect(box.grow(-2), Color(1, 1, 1, 0.08))
 			Icons.draw(self, m[0], box.get_center(), 30, Color(m[1]))
 
-	# ---- 左下角 ----
-	func _bottom_left() -> void:
-		# 头像框: 上面是圆拱的窗户, 头像以后再画
+	## 头像框的形状: 上面是圆拱的窗户
+	func arch() -> PackedVector2Array:
 		var r := PORTRAIT
-		var arch := PackedVector2Array()
+		var pts := PackedVector2Array()
 		var radius := r.size.x / 2.0
 		var top := r.position.y + radius
 		for k in range(0, 33):
 			var a := PI + PI * k / 32.0
-			arch.append(Vector2(r.get_center().x + cos(a) * radius, top + sin(a) * radius))
-		arch.append(r.end)
-		arch.append(Vector2(r.position.x, r.end.y))
-		draw_colored_polygon(arch, Color(0.06, 0.065, 0.075, 0.9))
+			pts.append(Vector2(r.get_center().x + cos(a) * radius, top + sin(a) * radius))
+		pts.append(r.end)
+		pts.append(Vector2(r.position.x, r.end.y))
+		return pts
+
+	# ---- 左下角 ----
+	func _bottom_left() -> void:
+		# 头像框 (底色和头像在下面一层 _back 里画, 这里只描边)
+		var r := PORTRAIT
+		var arch := arch()
 		var outline := arch.duplicate()
 		outline.append(arch[0])
 		draw_polyline(outline, Look.GOLD_DIM, 2.0, true)
-		Look.text_center(self, Rect2(r.position.x, r.position.y + 40, r.size.x, 30), "(头像以后再画)", 15, Color(Look.TEXT_DIM, 0.55), "sans")
 		if hud.player != "":
-			var realm: Dictionary = hud.world.realms[hud.player]
-			Look.text_center(self, Rect2(r.position.x, 878, r.size.x, 40), realm.ruler, 30, Look.TEXT)
-			Look.text_center(self, Rect2(r.position.x, 918, r.size.x, 30), realm.title, 18, Look.TEXT_DIM)
+			var me := hud.world.ruler(hud.player)
+			Look.panel(self, NAME_PLATE, Look.PANEL)
+			Look.text_center(self, NAME_PLATE, "%s · %d 岁" % [me.name, me.age(hud.clock.day)], 20, Look.TEXT)
 		else:
 			Look.text_center(self, Rect2(r.position.x, 890, r.size.x, 40), "还没选国王", 22, Look.TEXT_DIM)
 		# 头像左边三个小方块
@@ -376,6 +572,9 @@ class Root:
 			var rad: float = BOTTOM_ROW[i][1]
 			if i == 1:
 				draw_rect(STRESS_BAR, Color(0.06, 0.065, 0.075, 0.95))
+				if hud.player != "":
+					var st := hud.world.ruler(hud.player).stress / Person.MAX_STRESS
+					draw_rect(Rect2(STRESS_BAR.position, Vector2(STRESS_BAR.size.x * st, STRESS_BAR.size.y)), Color("b0503a"))
 				draw_rect(STRESS_BAR, Look.GOLD_DIM, false, 1.5)
 			Look.round_button(self, c, rad, labels[i], [Color("8a3a32"), Look.TEXT_DIM, Color("e0e4e8"), Icons.PARCHMENT][i], false, hot(Rect2(c - Vector2(rad, rad), Vector2(rad, rad) * 2)))
 
@@ -439,12 +638,87 @@ class Root:
 		Look.text_center(self, Rect2(BANNER.position.x, BANNER.position.y + 50, BANNER.size.x, 34), "在地图上点一块领地, 选一个国王来玩", 22, Look.TEXT, "sans")
 
 	# ---- 左边的领地窗口 ----
+	# ---- 左边的人物窗口 ----
+	func _person_panel() -> void:
+		var w := hud.world
+		var p: Person = w.people[hud.person_id]
+		var day := hud.clock.day
+		var r := SIDE_PANEL
+		Look.panel(self, r, Color(0.07, 0.075, 0.09, 1.0))
+		var realm: Dictionary = w.realms.get(p.realm, {})
+		var band: Color = realm.color if not realm.is_empty() else Look.GOLD_DIM
+		draw_rect(Rect2(r.position, Vector2(r.size.x, 312)), Color(band, 0.28))
+		draw_line(Vector2(0, 312), Vector2(r.size.x, 312), Look.GOLD_DIM, 2.0)
+		draw_rect(CHAR_FACE, Color(0.1, 0.1, 0.11))
+		draw_rect(CHAR_FACE.grow(2), Look.GOLD_DIM, false, 2.0)
+		Look.text_center(self, Rect2(r.end.x - 52, 14, 38, 38), "✕", 24, Look.TEXT if hot(Rect2(r.end.x - 52, 14, 38, 38)) else Look.TEXT_DIM, "sans")
+		# 名字、头衔、岁数、文化
+		Look.text(self, Vector2(284, 76), p.name, 34 if p.name.length() <= 6 else 26, Look.TEXT)
+		if not realm.is_empty():
+			Look.text(self, Vector2(286, 110), realm.title, 18, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, 250, "sans")
+		var born: int = GameDate.from_day(p.birth_day)[0]
+		# 9 世纪的人生年都只是「约」, 史料记的也是大概的年份
+		Look.text(self, Vector2(286, 144), "%d 岁 (约 %d 年生)" % [p.age(day), born], 18, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+		Look.text(self, Vector2(286, 174), p.culture_name(), 18, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+		if not realm.is_empty():
+			Icons.realm_arms(self, Rect2(286, 196, 56, 66), realm)
+			Look.text(self, Vector2(354, 236), w.realm_name(p.realm), 20, Look.TEXT)
+		# 健康、压力
+		Look.text(self, CHAR_HEALTH.position + Vector2(8, 25), "健康", 20, Look.GOLD)
+		var ht := p.health_text(day)
+		var hcol := Look.GREEN if ht in ["好", "很好"] else (Look.RED if ht in ["差", "很差"] else Look.TEXT)
+		Look.text(self, CHAR_HEALTH.position + Vector2(80, 25), ht, 20, hcol, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+		Look.text(self, CHAR_STRESS.position + Vector2(8, 25), "压力", 20, Look.GOLD)
+		var bar := Rect2(CHAR_STRESS.position + Vector2(80, 9), Vector2(300, 16))
+		draw_rect(bar, Color(0.12, 0.12, 0.13))
+		draw_rect(Rect2(bar.position, Vector2(bar.size.x * p.stress / Person.MAX_STRESS, bar.size.y)), Color("b0503a"))
+		for k in [1, 2]:
+			draw_line(bar.position + Vector2(bar.size.x * k / 3.0, 0), bar.position + Vector2(bar.size.x * k / 3.0, bar.size.y), Color(0, 0, 0, 0.6), 2.0)
+		draw_rect(bar, Look.GOLD_DIM, false, 1.0)
+		Look.text(self, bar.position + Vector2(bar.size.x + 14, 15), "%d (第 %d 档)" % [int(p.stress), p.stress_level()], 17, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+		# 性格特点
+		draw_line(Vector2(30, 420), Vector2(r.size.x - 30, 420), Color(Look.GOLD_DIM, 0.5), 1.0)
+		Look.text(self, Vector2(32, 452), "性格特点", 20, Look.GOLD)
+		var badges := hud._person_badges(p)
+		for i in badges.size():
+			var br := hud._badge_rect(i)
+			Icons.trait_icon(self, badges[i], br.get_center(), BADGE)
+			if hot(br):
+				draw_rect(br.grow(3), Look.GOLD, false, 2.0)
+		# 本事
+		draw_line(Vector2(30, 600), Vector2(r.size.x - 30, 600), Color(Look.GOLD_DIM, 0.5), 1.0)
+		Look.text(self, Vector2(32, 632), "本事", 20, Look.GOLD)
+		for i in Traits.SKILLS.size():
+			var sr := hud._skill_rect(i)
+			var c := Vector2(sr.get_center().x, CHAR_SKILLS_Y)
+			Icons.skill_icon(self, Traits.SKILLS[i], c, 52)
+			Look.text_center(self, Rect2(sr.position.x - 10, CHAR_SKILLS_Y + 30, sr.size.x + 20, 30), str(p.skill(Traits.SKILLS[i], day)), 24, Look.TEXT)
+			if hot(sr):
+				draw_rect(sr.grow(3), Look.GOLD, false, 2.0)
+		# 对你的好感
+		draw_line(Vector2(30, 760), Vector2(r.size.x - 30, 760), Color(Look.GOLD_DIM, 0.5), 1.0)
+		if hud.player == "":
+			Look.text(self, Vector2(32, 806), "(选好国王以后, 这里显示他对你的好感)", 17, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+		elif w.realms[hud.player].ruler_id == p.id:
+			Look.text(self, Vector2(32, 806), "这就是你", 22, Look.GREEN)
+		else:
+			var o := p.opinion_of(w.ruler(hud.player))
+			Look.text(self, Vector2(32, 806), "他对你的好感", 20, Look.GOLD)
+			var ocol := Look.GREEN if o.total > 0 else (Look.RED if o.total < 0 else Look.TEXT)
+			Look.text(self, Vector2(200, 808), "%+d" % o.total, 28, ocol)
+			Look.text(self, Vector2(280, 806), "(鼠标指着看为什么)", 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+		# 史料说明
+		if p.note != "":
+			draw_multiline_string(Look.font("sans"), Vector2(32, 880), "说明: " + p.note, HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 64, 16, 4, Look.TEXT_DIM)
+		if p.realm != "":
+			_wide_button(CHAR_BUTTON, "看看整个%s" % w.realm_name(p.realm), false)
+
 	func _county_panel() -> void:
 		var w := hud.world
 		var c := w.county_at(hud.county)
 		var realm := w.realm_of(c)
 		var r := SIDE_PANEL
-		Look.panel(self, r, Color(0.07, 0.075, 0.09, 0.97))
+		Look.panel(self, r, Color(0.07, 0.075, 0.09, 1.0))
 		# 顶上: 名字和爵位链
 		draw_rect(Rect2(r.position, Vector2(r.size.x, 150)), Color(realm.color, 0.35))
 		draw_line(Vector2(0, 150), Vector2(r.size.x, 150), Look.GOLD_DIM, 2.0)
@@ -455,17 +729,24 @@ class Root:
 		Look.text_center(self, Rect2(r.end.x - 52, 14, 38, 38), "✕", 24, Look.TEXT if hot(Rect2(r.end.x - 52, 14, 38, 38)) else Look.TEXT_DIM, "sans")
 		# 主人
 		var y := 200.0
-		Look.text(self, Vector2(40, y), "主人", 20, Look.GOLD)
-		Look.text(self, Vector2(40, y + 40), w.ruler_text(c.holder), 26, Look.TEXT)
+		var lord := w.ruler(c.holder)
+		draw_rect(PANEL_FACE, Color(0.12, 0.12, 0.13))
+		draw_rect(PANEL_FACE.grow(1), Look.GOLD_DIM, false, 1.5)
+		Look.text(self, Vector2(176, y), "主人", 20, Look.GOLD)
+		Look.text(self, Vector2(176, y + 36), realm.title, 18, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+		Look.text(self, Vector2(176, y + 72), lord.name, 30, Look.TEXT)
+		var born_text := "%d 岁 (约 %d 年生)" % [lord.age(hud.clock.day), GameDate.from_day(lord.birth_day)[0]]
+		Look.text(self, Vector2(176, y + 104), born_text, 17, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+		y = 240.0
 		var mine := w.counties_of(c.holder)
 		var area := 0
 		for m in mine:
 			area += m.area_km2
-		Look.text(self, Vector2(40, y + 74), "这个国家有 %d 块领地, %d 平方公里" % [mine.size(), area], 18, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+		Look.text(self, Vector2(40, y + 100), "这个国家有 %d 块领地, %d 平方公里" % [mine.size(), area], 17, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
 		if realm.random:
-			Look.text(self, Vector2(40, y + 100), "(史料里查不到这时候是谁在管, 统治者是随机生成的)", 16, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+			Look.text(self, Vector2(40, y + 124), "(史料里查不到这时候是谁在管, 统治者是随机生成的)", 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
 		# 这块领地
-		y = 360.0
+		y = 410.0
 		draw_line(Vector2(30, y - 30), Vector2(r.size.x - 30, y - 30), Color(Look.GOLD_DIM, 0.5), 1.0)
 		Look.text(self, Vector2(40, y), "这块领地", 20, Look.GOLD)
 		Look.text(self, Vector2(40, y + 34), "面积: %d 平方公里%s" % [c.area_km2, " · 靠海" if c.coastal else " · 不靠海"], 19, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
@@ -475,7 +756,7 @@ class Root:
 		var nb := "挨着: " + ("、".join(names) if not names.is_empty() else "没有 (是个岛)")
 		draw_multiline_string(Look.font("sans"), Vector2(40, y + 68), nb, HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 80, 19, 4, Look.TEXT)
 		# 同一个公国里的领地
-		y = 560.0
+		y = 600.0
 		draw_line(Vector2(30, y - 30), Vector2(r.size.x - 30, y - 30), Color(Look.GOLD_DIM, 0.5), 1.0)
 		var duchy := w.duchy_of(c)
 		Look.text(self, Vector2(40, y), "%s公国 (按法理) 的领地" % duchy.name, 20, Look.GOLD)

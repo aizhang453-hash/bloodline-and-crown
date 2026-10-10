@@ -70,6 +70,18 @@ func _run() -> void:
 	sheet.world = w
 	hud.add_child(sheet)
 	await _shot("8_图标和纹章")
+
+	sheet.queue_free()
+	var traits := TraitSheet.new()
+	hud.add_child(traits)
+	await _shot("9_特点图标")
+
+	traits.queue_free()
+	map.show_all()
+	hud.show_person(w.realms.gwynedd.ruler_id)
+	await _shot("10_人物窗口_罗德里")
+	hud.show_person(w.realms.isles.ruler_id)
+	await _shot("11_人物窗口_凯蒂尔")
 	quit()
 
 
@@ -95,3 +107,30 @@ class IconSheet:
 			var r := Rect2(60 + (i % 13) * 140, 480 + (i / 13) * 290, 90, 110)
 			Icons.realm_arms(self, r, realm)
 			Look.text_center(self, Rect2(r.position.x - 25, r.end.y + 8, 140, 28), world.realm_name(realm.id), 18, Look.TEXT)
+
+
+## 所有特点和本事的图标, 下面写名字
+class TraitSheet:
+	extends Control
+
+	func _ready() -> void:
+		set_anchors_preset(Control.PRESET_FULL_RECT)
+
+	func _draw() -> void:
+		draw_rect(Rect2(0, 0, 1920, 1080), Color(0.07, 0.075, 0.09))
+		var items := []
+		for t in Traits.data().personality:
+			items.append([t.id, t.name])
+		for t in Traits.data().congenital:
+			items.append([t.id, t.name])
+		for tr in Traits.data().education.tracks:
+			for lv in [1, 4]:
+				items.append([{"skill": tr.skill, "level": lv}, Traits.education_name({"skill": tr.skill, "level": lv})])
+		for i in items.size():
+			var c := Vector2(70 + (i % 18) * 104, 60 + (i / 18) * 112)
+			Icons.trait_icon(self, items[i][0], c, 64)
+			Look.text_center(self, Rect2(c.x - 52, c.y + 36, 104, 22), items[i][1], 14, Look.TEXT_DIM, "sans")
+		for i in Traits.SKILLS.size():
+			var c := Vector2(70 + i * 104, 1000)
+			Icons.skill_icon(self, Traits.SKILLS[i], c, 64)
+			Look.text_center(self, Rect2(c.x - 52, c.y + 36, 104, 22), Traits.skill_info(Traits.SKILLS[i]).name, 14, Look.TEXT_DIM, "sans")

@@ -23,7 +23,9 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if clock.advance(delta) > 0:
+	var days := clock.advance(delta)
+	if days > 0:
+		world.advance(days)
 		hud.redraw()
 
 
@@ -34,6 +36,7 @@ func play_as(realm_id: String) -> void:
 
 func close_panel() -> void:
 	hud.close_county()
+	hud.close_person()
 	map.set_selected(0)
 
 

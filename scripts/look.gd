@@ -12,7 +12,8 @@ const GREEN := Color("8fcf7a")
 const RED := Color("e07060")
 
 const SERIF := ["Songti SC", "STSong", "SimSun", "Noto Serif CJK SC", "Source Han Serif SC"]
-const SANS := ["PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC"]
+# 注意: Mac 上要「PingFang SC」会拿到「PingFang HK」(香港字形, 缺「迟」这些简体字), 所以不用苹方
+const SANS := ["Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", "STHeiti"]
 
 static var _fonts := {}
 
@@ -23,7 +24,7 @@ static func font(kind := "serif") -> Font:
 		var f := SystemFont.new()
 		f.font_names = PackedStringArray(SANS if kind == "sans" else SERIF)
 		var backup := SystemFont.new()
-		backup.font_names = PackedStringArray(SANS)
+		backup.font_names = PackedStringArray(SANS + SERIF)
 		f.fallbacks = [backup]
 		if kind == "map":
 			f.multichannel_signed_distance_field = true

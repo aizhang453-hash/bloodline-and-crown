@@ -1,5 +1,5 @@
 {
- "说明": "867 年 1 月 1 日的不列颠群岛。爵位: 帝国 > 王国 > 公国 > 领地 (伯爵领)。holder 是开局时这块领地归哪个国家。ruler 为 null 的国家开局时随机生成统治者 (names 是用哪种名字)。",
+ "说明": "867 年 1 月 1 日的不列颠群岛。爵位: 帝国 > 王国 > 公国 > 领地 (伯爵领)。holder 是开局时这块领地归哪个国家。ruler 为 null 的国家开局时随机生成统治者 (用 culture 那种文化的名字)。born 是统治者的生年, born_estimated 为 true 是史料没记、估计的。looks 是史料里讲到的长相 (盖过随机的长相基因)。 personality 是史料里能看出来的性格 (不够 3 个随机补), base_skills 是史料里看得出擅长的本事 (底子 8 = 中上, 10 = 高); 都写在 note 里。",
  "start_date": [
   867,
   1,
@@ -1240,184 +1240,340 @@
   {
    "id": "wessex",
    "ruler": "埃塞尔雷德一世",
-   "names": null,
    "title": "威塞克斯国王",
-   "color": "#b0352b"
+   "color": "#b0352b",
+   "culture": "anglo_saxon",
+   "born": 847,
+   "born_estimated": false,
+   "note": "生年: 约 847 年 (史料) 虔信、勇敢: 阿瑟写他在阿什当战役开打前非要在帐篷里听完弥撒才出来; 871 年一年跟维京人打了九仗。",
+   "personality": [
+    "zealous",
+    "brave"
+   ],
+   "base_skills": {
+    "martial": 8
+   }
   },
   {
    "id": "mercia",
    "ruler": "伯格雷德",
-   "names": null,
    "title": "麦西亚国王",
-   "color": "#3d6a9c"
+   "color": "#3d6a9c",
+   "culture": "anglo_saxon",
+   "born": 828,
+   "born_estimated": true,
+   "note": "852 年当王, 生年按这个估 虔信: 874 年被维京人赶走后去了罗马, 葬在罗马的英格兰人教堂。娶了威塞克斯的公主, 跟威塞克斯联手打仗。",
+   "personality": [
+    "zealous"
+   ],
+   "base_skills": {
+    "diplomacy": 8
+   }
   },
   {
    "id": "east_anglia",
    "ruler": "埃德蒙",
-   "names": null,
    "title": "东盎格利亚国王",
-   "color": "#d18b2c"
+   "color": "#d18b2c",
+   "culture": "anglo_saxon",
+   "born": 841,
+   "born_estimated": false,
+   "note": "生年: 约 841 年 (传记说 855 年 14 岁当王) 虔信、勇敢: 圣人传记 (约 985 年) 说他被维京人抓住后不肯放弃信仰, 被杀, 后来被当成圣人。",
+   "personality": [
+    "zealous",
+    "brave"
+   ]
   },
   {
    "id": "northumbria",
    "ruler": "埃拉",
-   "names": null,
    "title": "诺森布里亚国王",
-   "color": "#7a4d8c"
+   "color": "#7a4d8c",
+   "culture": "anglo_saxon",
+   "born": 825,
+   "born_estimated": true,
+   "note": "生年不详, 估计 野心勃勃: 《盎格鲁-撒克逊编年史》说他不是王族出身, 诺森布里亚人赶走老国王立了他 (Claude 推的)。残忍: 冰岛萨迦的传说, 他把维京首领朗纳尔扔进蛇坑。",
+   "personality": [
+    "ambitious",
+    "sadistic"
+   ]
   },
   {
    "id": "great_army",
    "ruler": "无骨者伊瓦尔",
-   "names": null,
    "title": "维京大军首领",
-   "color": "#4b4f57"
+   "color": "#4b4f57",
+   "culture": "norse",
+   "born": 830,
+   "born_estimated": true,
+   "note": "生年不详, 估计 狡诈: 冰岛萨迦都说他足智多谋、会用计。残忍: 圣人传记说他和弟弟乌巴杀了不肯弃教的东盎格利亚国王埃德蒙。外号「无骨者」的意思说法不一, 没加特点。",
+   "personality": [
+    "deceitful",
+    "sadistic"
+   ],
+   "base_skills": {
+    "martial": 10,
+    "intrigue": 10
+   }
   },
   {
    "id": "cornwall",
    "ruler": "栋加斯",
-   "names": null,
    "title": "康沃尔国王",
-   "color": "#6f7d3a"
+   "color": "#6f7d3a",
+   "culture": "cornish",
+   "born": 815,
+   "born_estimated": true,
+   "note": "生年不详, 估计 (康沃尔人说布立吞语, 跟威尔士人近, 头像先借威尔士的样子) 虔信: 康沃尔的「栋加斯国王石」上刻着他请人为他的灵魂祈祷。",
+   "personality": [
+    "zealous"
+   ]
   },
   {
    "id": "alba",
    "ruler": "康斯坦丁一世",
-   "names": null,
    "title": "阿尔巴国王",
-   "color": "#2f7f8a"
+   "color": "#2f7f8a",
+   "culture": "gaelic",
+   "born": 836,
+   "born_estimated": true,
+   "note": "父亲基纳德 858 年死, 他 862 年当王, 生年按这个估 勇敢: 一直跟维京人打仗, 877 年死在跟维京人的仗里 (Claude 推的)。",
+   "personality": [
+    "brave"
+   ],
+   "base_skills": {
+    "martial": 8
+   }
   },
   {
    "id": "strathclyde",
    "ruler": "阿特加尔",
-   "names": null,
    "title": "斯特拉斯克莱德国王",
-   "color": "#8c6a3d"
+   "color": "#8c6a3d",
+   "culture": "cumbric",
+   "born": 820,
+   "born_estimated": true,
+   "note": "生年不详, 估计 (斯特拉斯克莱德人说坎布里亚语 (布立吞语的一支), 头像先借威尔士的样子)"
   },
   {
    "id": "galloway",
    "ruler": null,
-   "names": "norse_gael",
    "title": "加洛韦领主",
-   "color": "#5d8c5a"
+   "color": "#5d8c5a",
+   "culture": "norse_gael"
   },
   {
    "id": "isles",
    "ruler": "扁鼻子凯蒂尔",
-   "names": null,
    "title": "群岛之王",
-   "color": "#56607a"
+   "color": "#56607a",
+   "culture": "norse",
+   "born": 805,
+   "born_estimated": true,
+   "note": "传说里女儿奥德约 834 年生, 按这个估; 外号「扁鼻子」 野心勃勃: 萨迦说挪威国王派他去平定赫布里底, 他自己当了那里的主人, 不肯进贡。",
+   "looks": {
+    "nose": 3
+   },
+   "personality": [
+    "ambitious"
+   ]
   },
   {
    "id": "man",
    "ruler": null,
-   "names": "norse_gael",
    "title": "马恩岛首领",
-   "color": "#9c4f6b"
+   "color": "#9c4f6b",
+   "culture": "norse_gael"
   },
   {
    "id": "orkney",
    "ruler": null,
-   "names": "norse",
    "title": "奥克尼首领",
-   "color": "#6b6f8c"
+   "color": "#6b6f8c",
+   "culture": "norse"
   },
   {
    "id": "gwynedd",
    "ruler": "罗德里大王",
-   "names": null,
    "title": "格温内斯和波伊斯国王",
-   "color": "#3f8c4a"
+   "color": "#3f8c4a",
+   "culture": "welsh",
+   "born": 820,
+   "born_estimated": false,
+   "note": "生年: 约 820 年 (史料) 勇敢: 856 年在安格尔西岛杀了丹麦人首领戈尔姆。靠继承和娶妻把格温内斯、波伊斯连成一片。",
+   "personality": [
+    "brave"
+   ],
+   "base_skills": {
+    "martial": 10,
+    "diplomacy": 10
+   }
   },
   {
    "id": "seisyllwg",
    "ruler": "古贡",
-   "names": null,
    "title": "塞瑟西尔格国王",
-   "color": "#b5a03a"
+   "color": "#b5a03a",
+   "culture": "welsh",
+   "born": 815,
+   "born_estimated": true,
+   "note": "生年不详, 估计"
   },
   {
    "id": "dyfed",
    "ruler": "希瓦伊兹",
-   "names": null,
    "title": "德费德国王",
-   "color": "#a8573a"
+   "color": "#a8573a",
+   "culture": "welsh",
+   "born": 830,
+   "born_estimated": false,
+   "note": "生年: 约 830 年 (史料) 贪婪、专断: 阿瑟写他常常抢圣大卫修道院、赶走主教, 连阿瑟本人都被他赶走过。",
+   "personality": [
+    "greedy",
+    "arbitrary"
+   ]
   },
   {
    "id": "brycheiniog",
-   "ruler": null,
-   "names": "welsh",
+   "ruler": "埃利塞德",
    "title": "布雷肯国王",
-   "color": "#7d5a8c"
+   "color": "#7d5a8c",
+   "culture": "welsh",
+   "born": 840,
+   "born_estimated": true,
+   "note": "880 年代还在位, 按这个估"
   },
   {
    "id": "glywysing",
    "ruler": "休厄尔",
-   "names": null,
    "title": "格利维辛国王",
-   "color": "#3a7d8c"
+   "color": "#3a7d8c",
+   "culture": "welsh",
+   "born": 815,
+   "born_estimated": true,
+   "note": "生年不详, 估计 虔信: 兰特威特梅杰教堂里的石十字架是他为父亲的灵魂立的。",
+   "personality": [
+    "zealous"
+   ]
   },
   {
    "id": "gwent",
    "ruler": "梅里格",
-   "names": null,
    "title": "格温特国王",
-   "color": "#8c3a5a"
+   "color": "#8c3a5a",
+   "culture": "welsh",
+   "born": 820,
+   "born_estimated": true,
+   "note": "849 年当王, 按这个估"
   },
   {
    "id": "ailech",
    "ruler": "艾德·芬德利亚斯",
-   "names": null,
    "title": "爱尔兰至尊王、艾莱赫国王",
-   "color": "#c8a24a"
+   "color": "#c8a24a",
+   "culture": "gaelic",
+   "born": 830,
+   "born_estimated": true,
+   "note": "生年不详, 估计; 外号「芬德利亚斯」= 浅色发灰的 勇敢: 《阿尔斯特年鉴》记他 866 年把北边维京人的营地全抢了一遍。先后娶了凯尔伯尔的妹妹和阿尔巴国王的女儿。",
+   "looks": {
+    "hair": "fair_grey"
+   },
+   "personality": [
+    "brave"
+   ],
+   "base_skills": {
+    "martial": 10,
+    "diplomacy": 8
+   }
   },
   {
    "id": "ulaid",
    "ruler": "莱斯洛巴尔",
-   "names": null,
    "title": "乌莱德国王",
-   "color": "#4a8cc8"
+   "color": "#4a8cc8",
+   "culture": "gaelic",
+   "born": 805,
+   "born_estimated": true,
+   "note": "857 年当王, 873 年死, 估计"
   },
   {
    "id": "mide",
    "ruler": "唐哈德",
-   "names": null,
    "title": "米斯国王",
-   "color": "#8cb04a"
+   "color": "#8cb04a",
+   "culture": "gaelic",
+   "born": 830,
+   "born_estimated": true,
+   "note": "生年不详, 估计"
   },
   {
    "id": "dublin",
    "ruler": "阿姆莱夫",
-   "names": null,
    "title": "都柏林国王",
-   "color": "#3a3f4a"
+   "color": "#3a3f4a",
+   "culture": "norse_gael",
+   "born": 825,
+   "born_estimated": true,
+   "note": "生年不详, 估计; 冰岛传说叫他「白色的奥拉夫」= 浅色头发 野心勃勃、冷酷: 《爱尔兰残篇编年史》(不太可靠) 说他跟人一起杀了自己的兄弟。870 年跟伊瓦尔围攻邓巴顿四个月打了下来。",
+   "looks": {
+    "hair": "flaxen"
+   },
+   "personality": [
+    "ambitious",
+    "callous"
+   ],
+   "base_skills": {
+    "martial": 10
+   }
   },
   {
    "id": "leinster",
    "ruler": "敦莱恩",
-   "names": null,
    "title": "伦斯特国王",
-   "color": "#c84a4a"
+   "color": "#c84a4a",
+   "culture": "gaelic",
+   "born": 825,
+   "born_estimated": true,
+   "note": "生年不详, 估计"
   },
   {
    "id": "osraige",
    "ruler": "凯尔伯尔",
-   "names": null,
    "title": "奥索里国王",
-   "color": "#4ac8a0"
+   "color": "#4ac8a0",
+   "culture": "gaelic",
+   "born": 820,
+   "born_estimated": true,
+   "note": "842 年当王, 888 年死, 估计 狡诈、野心勃勃: 一会儿跟维京人结盟打别的爱尔兰国王, 一会儿又打维京人, 把小小的奥索里变成了大势力。",
+   "personality": [
+    "deceitful",
+    "ambitious"
+   ],
+   "base_skills": {
+    "martial": 10,
+    "diplomacy": 10,
+    "intrigue": 10
+   }
   },
   {
    "id": "munster",
    "ruler": "肯·法拉德",
-   "names": null,
    "title": "芒斯特国王",
-   "color": "#a04ac8"
+   "color": "#a04ac8",
+   "culture": "gaelic",
+   "born": 820,
+   "born_estimated": true,
+   "note": "生年不详, 估计"
   },
   {
    "id": "connacht",
    "ruler": "穆格隆",
-   "names": null,
    "title": "康诺特国王",
-   "color": "#c87a4a"
+   "color": "#c87a4a",
+   "culture": "gaelic",
+   "born": 815,
+   "born_estimated": true,
+   "note": "848 年当王, 估计"
   }
  ]
 }

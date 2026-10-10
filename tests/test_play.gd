@@ -37,16 +37,21 @@ func click_map(p: Vector2, button := MOUSE_BUTTON_LEFT) -> void:
 		map._unhandled_input(ev)
 
 
-## 点界面上的一个能点的地方 (按位置找)
+## 点界面上的一个能点的地方 (按位置找; 跟 Godot 一样, 后加的在上面, 先接到点击)
 func click_hud(p: Vector2) -> bool:
-	for s in hud._spots + hud._county_spots:
-		if s.visible and s.on_click.is_valid() and Rect2(s.position, s.size).has_point(p):
+	var all: Array = hud._spots + hud._county_spots + hud._person_spots
+	all.reverse()
+	for s in all:
+		if not s.visible or not Rect2(s.position, s.size).has_point(p):
+			continue
+		if s.on_click.is_valid():
 			var ev := InputEventMouseButton.new()
 			ev.position = p - s.position
 			ev.button_index = MOUSE_BUTTON_LEFT
 			ev.pressed = true
 			s._gui_input(ev)
 			return true
+		return false  # 上面这一块挡住了, 点不到下面的
 	return false
 
 
@@ -130,6 +135,19 @@ func test_choose_ruler_and_play() -> void:
 	eq(main.clock.text(), "867 年 1 月 31 日", "暂停了不走")
 
 
+func test_faces_in_hud() -> void:
+	check(not hud._player_face.visible, "没选国王时左下角没有头像")
+	main.play_as("gwynedd")
+	check(hud._player_face.visible, "选了国王, 左下角有头像")
+	eq(hud._player_face.texture, hud.face(world.ruler("gwynedd")))
+	main._on_county_clicked(world.by_id.york.index)
+	check(hud._county_face.visible, "领地窗口里有主人的头像")
+	check(not hud._player_face.visible, "左边窗口开着时盖住左下角的头像")
+	eq(hud._county_face.texture, hud.face(world.ruler("great_army")))
+	key(KEY_ESCAPE)
+	check(hud._player_face.visible and not hud._county_face.visible, "关了窗口, 左下角的头像回来")
+
+
 func test_play_button_only_before_choosing() -> void:
 	main.play_as("wessex")
 	main._on_county_clicked(world.by_id.cashel.index)
@@ -188,3 +206,35 @@ func test_every_county_clickable() -> void:
 		map.focus(c.seat)
 		click_map(map.map_to_screen(c.seat))
 		eq(hud.county, c.index, c.name + " 点得到")
+
+
+func test_character_window() -> void:
+	main.play_as("wessex")
+	check(click_hud(Hud.PORTRAIT.get_center()), "点左下角的头像")
+	eq(hud.person_id, world.realms.wessex.ruler_id, "打开自己国王的人物窗口")
+	check(hud._person_face.visible and not hud._player_face.visible)
+	check(not hud._person_spots.is_empty(), "人物窗口里有能指的地方")
+	key(KEY_ESCAPE)
+	eq(hud.person_id, "", "Esc 关上")
+	main._on_county_clicked(world.by_id.york.index)
+	check(click_hud(Hud.PANEL_FACE.get_center()), "点领地窗口里主人的头像")
+	eq(hud.person_id, world.realms.great_army.ruler_id, "打开伊瓦尔的人物窗口")
+	eq(hud.county, 0, "领地窗口让给人物窗口")
+	var tips := hud._person_spots.map(func(x: Control) -> String: return x.tooltip_text)
+	check(tips.any(func(t: String) -> bool: return t.begins_with("他对你的好感")), "看别人时有好感说明")
+	check(tips.any(func(t: String) -> bool: return t.begins_with("健康")), "有健康说明")
+	check(click_hud(Hud.CHAR_BUTTON.get_center()), "点「看看整个维京大军」")
+	check(map.camera.position.distance_to(world.by_id.york.seat) < 300)
+	main._on_county_clicked(world.by_id.dublin.index)
+	eq(hud.person_id, "", "点地图换成领地窗口")
+	eq(hud.county, world.by_id.dublin.index)
+
+
+func test_every_ruler_window_opens() -> void:
+	main.play_as("alba")
+	for id in world.realm_order:
+		hud.show_person(world.realms[id].ruler_id)
+		var traits := hud._person_badges(world.ruler(id))
+		check(traits.size() >= 4, "%s 至少 3 个性格 + 教育" % world.ruler(id).name)
+	hud.close_person()
+	eq(hud._person_spots.size(), 0, "关了以后能指的地方清掉")

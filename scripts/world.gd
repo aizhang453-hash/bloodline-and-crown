@@ -13,13 +13,15 @@ var kingdoms := {}       # id -> {id, name}
 var duchies := {}        # id -> {id, name, kingdom}
 var counties: Array = [] # 第 i 个是编号 i + 1 的领地 (领地图上的编号从 1 开始, 0 是海)
 var by_id := {}          # 领地 id -> 领地
-var realms := {}         # 国家 id -> {id, ruler, title, color, random, index}
+var realms := {}         # 国家 id -> {id, ruler (名字), ruler_id, title, color, culture, random, index}
+var people := {}         # 人的 id -> Person
 var realm_order: Array = []
 var map_size: Vector2i
 var km_per_px: float
 var coastline: Array = [] # 每个岛一圈 PackedVector2Array (领地图上的像素坐标)
 
 
+## seed: 随机的东西 (查不到的统治者的名字、长相基因、生日) 用的种子, 每局开新游戏换一个
 static func load_867(name_seed: int = 867) -> World:
 	var w := World.new()
 	w._load(_read_json(WORLD_FILE), _read_json(MAP_FILE), _read_json(NAMES_FILE), name_seed)
@@ -44,14 +46,41 @@ func _load(data: Dictionary, map: Dictionary, names: Dictionary, name_seed: int)
 	rng.seed = name_seed
 	for r in data.realms:
 		var realm := {
-			"id": r.id, "title": r.title, "color": Color(r.color),
+			"id": r.id, "title": r.title, "color": Color(r.color), "culture": r.culture,
 			"random": r.ruler == null, "index": realm_order.size() + 1,
 		}
+		var ruler := Person.new()
+		ruler.id = "ruler_" + r.id
+		ruler.culture = r.culture
+		ruler.rank = "king"
+		ruler.realm = r.id
+		var born: int
 		if r.ruler == null:
-			var pool: Array = names[r.names]
-			realm.ruler = pool[rng.randi_range(0, pool.size() - 1)]
+			# 史料查不到: 名字从当地当时的名字里挑, 年纪随机
+			var pool: Array = names.male.get(r.culture, names.male[Portrait.style(r.culture)])
+			ruler.name = pool[rng.randi_range(0, pool.size() - 1)]
+			born = rng.randi_range(812, 845)
+			ruler.birth_estimated = true
+			ruler.note = "史料里查不到这时候是谁在管, 统治者是随机生成的"
 		else:
-			realm.ruler = r.ruler
+			ruler.name = r.ruler
+			born = int(r.born)
+			ruler.birth_estimated = r.born_estimated
+			ruler.note = r.get("note", "")
+		# 只知道哪一年生的, 生日那天随机
+		ruler.birth_day = GameDate.to_day(born, 1, 1) + rng.randi_range(0, GameDate.YEAR_DAYS - 1)
+		ruler.dna = Portrait.random_dna(rng, r.culture)
+		ruler.dna.merge(r.get("looks", {}), true)  # 史料里讲到的长相盖过随机的
+		# 性格、天生的特点、教育、本事的底子: 史料里写了的照着给 (world_867.json), 没写的随机
+		ruler.traits = Traits.random_personality(rng, 3, r.get("personality", []))
+		ruler.traits.append_array(r.get("congenital", Traits.random_congenital(rng)))
+		ruler.education = r.get("education", Traits.random_education(rng, "king"))
+		for s in Traits.SKILLS:
+			ruler.base_skills[s] = rng.randi_range(2, 7)
+		ruler.base_skills.merge(r.get("base_skills", {}), true)
+		people[ruler.id] = ruler
+		realm.ruler = ruler.name
+		realm.ruler_id = ruler.id
 		realms[r.id] = realm
 		realm_order.append(r.id)
 
@@ -102,6 +131,17 @@ func counties_of(realm_id: String) -> Array:
 
 func counties_in_duchy(duchy_id: String) -> Array:
 	return counties.filter(func(c: Dictionary) -> bool: return c.duchy == duchy_id)
+
+
+## 过了几天 (每个人的压力慢慢降……以后还有变老生病)
+func advance(days: int) -> void:
+	for p in people.values():
+		p.pass_days(days)
+
+
+## 这个国家的统治者
+func ruler(realm_id: String) -> Person:
+	return people[realms[realm_id].ruler_id]
 
 
 ## 国家的全称, 比如「威塞克斯国王 埃塞尔雷德一世」
