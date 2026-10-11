@@ -182,8 +182,8 @@ func test_map_mode_buttons() -> void:
 
 func test_unfinished_buttons_say_later() -> void:
 	for i in Hud.RIGHT_MENU_Y.size():
-		if i in [0, 1, 4]:
-			continue  # 「领地」第 5 块、「军队」第 6 块、「阴谋」第 7 块做好了
+		if i in [0, 1, 3, 4]:
+			continue  # 「领地」第 5 块、「军队」第 6 块、「议会」第 9 块、「阴谋」第 7 块做好了
 		var y: float = Hud.RIGHT_MENU_Y[i]
 		hud._toast = ""
 		check(click_hud(Vector2(1898, y)), "右边按钮 %d" % y)
@@ -1118,3 +1118,124 @@ func test_rules_defaults_and_reset() -> void:
 		if Rect2(sp.position, sp.size) == hud._rules_reset():
 			has_reset = true
 	check(not has_reset, "开始以后没有「恢复默认」")
+
+
+# ---- 第 9 块: 议会 ----
+
+func test_council_window() -> void:
+	main.play_as("wessex")
+	var k := hud.me()
+	check(click_hud(Vector2(1898, Hud.RIGHT_MENU_Y[3])), "右边一列第四个「议会」能点")
+	eq(hud.window.get("kind", ""), "council")
+	eq(hud.window.rows.size(), 6, "五个大臣 + 心腹")
+	# 左边点人: 换人
+	click_hud(hud.council_half(2, false).get_center())  # 管家
+	eq(hud.window.get("kind", ""), "council_pick")
+	eq(hud.window.seat, "steward")
+	var i := -1
+	for j in hud.window.rows.size():
+		if hud.window.rows[j].get("new", false):
+			i = j
+			break
+	check(i >= 0, "列了能请来的本地人")
+	var newbie: Person = hud.window.rows[i].person
+	click_hud(hud._win_row_rect(i).get_center())
+	eq(hud.window.get("kind", ""), "council", "选了回到议会")
+	eq(world.council.member(k, "steward"), newbie, "请来的本地人当了管家")
+	check(world.people.has(newbie.id))
+	# 右边点活: 换一件活
+	click_hud(hud.council_half(0, true).get_center())  # 首相的活
+	eq(hud.window.get("kind", ""), "council_task")
+	var f := -1
+	for j in hud.window.rows.size():
+		if hud.window.rows[j].id == "foreign":
+			f = j
+	click_hud(hud._win_row_rect(f).get_center())
+	eq(world.council.council_of(k).chancellor.task, "foreign", "首相改办外交")
+	eq(hud.window.get("kind", ""), "council")
+	no_meta("议会窗口")
+
+
+func test_council_pick_target() -> void:
+	main.play_as("mercia")
+	var k := hud.me()
+	hud._open_window("council_task", 0, {"seat": "chaplain"})
+	var t := -1
+	for j in hud.window.rows.size():
+		if hud.window.rows[j].id == "target":
+			t = j
+	check(t >= 0, "编造宣称能换目标")
+	click_hud(hud._win_row_rect(t).get_center())
+	eq(hud.window.get("kind", ""), "council_target")
+	var last: int = hud.window.rows.size() - 1
+	var want: String = hud.window.rows[last].id
+	click_hud(hud._win_row_rect(mini(last, hud._win_rows() - 1)).get_center())
+	if last < hud._win_rows():
+		eq(world.council.council_of(k).chaplain.target, want, "换了目标")
+	eq(hud.window.get("kind", ""), "council")
+
+
+# ---- 对犯人的处置 (照三代) ----
+
+func test_prisoner_actions() -> void:
+	main.play_as("wessex")
+	var k := hud.me()
+	var v: Person = world.vassals_of(k)[0]
+	v.prisoner_of = k.id
+	hud.show_person(v.id)
+	hud._open_actions()
+	var names: Array = hud.window.rows.map(func(r: Dictionary) -> String: return r.name)
+	for n in ["用刑", "刺瞎", "阉割", "逼他出家", "流放"]:
+		check(names.has(n), "关着的人的互动里有「%s」" % n)
+	var i: int = names.find("刺瞎")
+	var page_rows: int = hud._win_rows()
+	hud.window.page = i / page_rows
+	hud._make_window_spots()
+	var rect := hud._win_row_rect(i % page_rows)
+	click_hud(rect.get_center())
+	check(not v.has_trait("blind"), "狠的事要点两次")
+	click_hud(rect.get_center())
+	check(v.has_trait("blind"), "点两次刺瞎了")
+	no_meta("对犯人的处置")
+	hud.show_person(k.id)
+	var dread_spot := false
+	for sp in hud._person_spots:
+		if Rect2(sp.position, sp.size) == Hud.CHAR_DREAD:
+			dread_spot = sp.tooltip_text.begins_with("恐惧")
+	check(dread_spot, "人物窗口里有恐惧")
+
+
+# ---- 性别法、随母婚 ----
+
+func test_gender_law_row() -> void:
+	main.play_as("wessex")
+	var k := hud.me()
+	k.prestige = 600.0
+	hud._open_realm_window()
+	var i := -1
+	for j in hud.window.rows.size():
+		if hud.window.rows[j].type == "gender":
+			i = j
+	check(i >= 0, "国家窗口里有性别法")
+	var rect := hud._win_row_rect(i)
+	click_hud(rect.get_center())
+	eq(world.gender_law("wessex"), "male_only", "要点两次")
+	click_hud(rect.get_center())
+	eq(world.gender_law("wessex"), "male_pref", "点两次改成男人优先")
+	eq(k.prestige, 100.0)
+
+
+func test_matri_toggle() -> void:
+	main.play_as("wessex")
+	var k := hud.me()
+	var d := world.make_noble("anglo_saxon", true, 17, main.clock.day)
+	d.house = k.house
+	d.father = k.id
+	world._register(d)
+	hud.show_person(d.id)
+	hud._open_match()
+	eq(hud.window.get("matri", false), false, "普通女儿默认不随母")
+	check(click_hud(Hud.MATCH_MATRI.get_center()), "女的说亲有随母婚开关")
+	eq(hud.window.matri, true)
+	var labels: Array = hud.window.rows[0].acc.parts.map(func(x: Array) -> String: return x[0])
+	check(labels.any(func(l: String) -> bool: return l.begins_with("随母婚")), "肯不肯里算上随母婚")

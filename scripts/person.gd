@@ -73,6 +73,11 @@ var last_break := -100000     # 上次崩溃是哪天
 var conditions: Array = []    # 一阵子的身体状况 (第 8 块: 落马受伤、咳嗽……): [{text, health, until}]
 var decision_used := {}       # 决议上次用是哪天 (有冷却的: 解压的决议三年一次)
 var boons: Array = []         # 一阵子每月多收 (少收) 的钱 (第 8 块: 集市、金匠、强盗……): [{text, gold, until}]
+var court := ""               # 请来住在谁的宫廷 (第 9 块: 当大臣请来的本地人; 议会的 key)
+var clergy := false           # 修士 (第 9 块: 基督徒的宫廷牧师请来的修士, 不结婚)
+var council_opinion := {}     # 议会带来的好感 (不存档, World 每月重算): 对谁 -> [[说明, 加减], ...]
+var matrilineal := false      # 这门婚事是随母婚 (女的这边记: 孩子算她的家族; 照三代)
+var dread := 0.0              # 恐惧 (照三代 0–100): 酷刑、刺瞎、阉割、处死会涨, 每月往「本来的恐惧」走 0.5
 
 
 ## 在某一天几岁 (过了生日才算长一岁; 死了的人停在死的那年)
@@ -88,7 +93,8 @@ func adult(day: int) -> bool:
 
 ## 画头像要的东西
 func looks(day: int) -> Dictionary:
-	return {"female": female, "age": age(day), "culture": culture, "rank": rank, "dna": dna}
+	return {"female": female, "age": age(day), "culture": culture, "rank": rank, "dna": dna,
+			"beardless": has_trait("beardless_eunuch"), "blind": has_trait("blind")}
 
 
 func culture_name() -> String:
@@ -110,6 +116,47 @@ func congenital() -> Array:
 ## 排解压力的毛病 (第 8 块)
 func coping() -> Array:
 	return _of_kind("coping")
+
+
+## 身体上的 (受伤、瞎了、被阉)
+func physical() -> Array:
+	return _of_kind("physical")
+
+
+## 能不能继承、有宣称 (阉人、修士不能; 照三代)
+func can_inherit() -> bool:
+	return not clergy and not has_trait("eunuch") and not has_trait("beardless_eunuch")
+
+
+## 本来的恐惧 (照三代: 残忍 +35、易怒 +20、仁慈 -15), 恐惧每月往这里走
+func natural_dread() -> float:
+	var v := 0.0
+	if has_trait("sadistic"):
+		v += 35.0
+	if has_trait("wrathful"):
+		v += 20.0
+	if has_trait("compassionate"):
+		v -= 15.0
+	return clampf(v, 0.0, 100.0)
+
+
+## 胆量 (三代藏起来的 boldness; 数字我们定的): 恐惧比胆量高 20 就「怕你」, 高 45 就「吓坏了」
+func boldness() -> float:
+	var v := 0.0
+	for t in [["arrogant", 10.0], ["ambitious", 10.0], ["wrathful", 10.0], ["vengeful", 5.0], ["shy", -10.0], ["humble", -5.0], ["paranoid", -5.0], ["trusting", -5.0]]:
+		if has_trait(t[0]):
+			v += t[1]
+	return v
+
+
+## 怕不怕 ruler: 0 不怕、1 怕他、2 吓坏了 (照三代: 勇敢的永远不怕, 怯懦的永远吓坏了)
+func fear_of(ruler: Person) -> int:
+	if ruler == null or ruler == self or has_trait("brave"):
+		return 0
+	if has_trait("craven"):
+		return 2
+	var d := ruler.dread - boldness()
+	return 2 if d >= 45.0 else (1 if d >= 20.0 else 0)
 
 
 func _of_kind(kind: String) -> Array:
@@ -155,7 +202,7 @@ const SAVE_FIELDS := ["id", "name", "female", "birth_day", "birth_estimated", "c
 	"traits", "education", "base_skills", "stress", "father", "mother", "spouse", "former_spouses", "secondary", "homeland",
 	"betrothed", "pregnant", "last_birth", "focus", "guardian", "edu_points", "edu_years", "taught", "house", "alive",
 	"death_day", "prestige", "liege_realm", "contract", "gold", "tyranny", "prisoner_of", "dungeon", "crimes", "memories",
-	"claims", "weak_claims", "levy_ratio", "secrets", "hooks", "scheme_blocked", "break_level", "last_break", "conditions", "decision_used", "boons"]
+	"claims", "weak_claims", "levy_ratio", "secrets", "hooks", "scheme_blocked", "break_level", "last_break", "conditions", "decision_used", "boons", "court", "clergy", "dread", "matrilineal"]
 
 
 func to_save() -> Dictionary:
@@ -300,7 +347,7 @@ func opinion_of(other: Person) -> Dictionary:
 			for o in other.personality():
 				if Traits.opposite(t, o):
 					parts.append(["我「%s」, 他「%s」" % [info.name, Traits.get_trait(o).name], -10])
-	for t in other.congenital() + other._of_kind("stress"):
+	for t in other.congenital() + other._of_kind("stress") + other.physical():
 		var info := Traits.get_trait(t)
 		if info.has("opinion"):
 			parts.append(["他%s" % info.name, int(info.opinion)])
@@ -317,6 +364,8 @@ func opinion_of(other: Person) -> Dictionary:
 	for m in memories:
 		if m.who == other.id:
 			parts.append([m.text, int(m.value)])
+	for x in council_opinion.get(other.id, []):
+		parts.append(x)
 	var total := 0
 	for p in parts:
 		total += int(p[1])
@@ -343,6 +392,8 @@ func fertility(day: int) -> float:
 		f *= 0.75
 	if has_trait("inbred"):
 		f *= 0.7
+	for t in physical():
+		f *= float(Traits.get_trait(t).get("fertility", 1.0))
 	if health(day) < 2.5:
 		f *= 0.7
 	return f

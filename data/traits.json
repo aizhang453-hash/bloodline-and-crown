@@ -1,5 +1,5 @@
 {
- "说明": "人物的特点 (第 2 块, 照三代的分法, 名字和数字是我们自己定的, 试玩再调)。skills 是加减哪项本事 (all = 六项都加); health 是加减健康; opinion 是别人对他的好感加减。性格一样的人互相 +10, 相反的互相 -10。 inherit 是爸妈一个有这个天生特点时孩子也有的机会 (百分之几, 两个都有翻倍; 第 4 块)。childhood 是 3 岁有的「小时候的性格」(照三代的五种): focus 是学哪样学得好, grows_into 是长大以后容易有的性格。 coping 是压力崩溃时染上的排解压力的毛病 (第 8 块, 照三代): 每个让压力降得快 20%, 带一个解压的决议 (decision: 名字、说明、降多少压力、三年一次); stress 是崩溃得重了才有的特点 (忧郁、疯癫)。",
+ "说明": "人物的特点 (第 2 块, 照三代的分法, 名字和数字是我们自己定的, 试玩再调)。skills 是加减哪项本事 (all = 六项都加); health 是加减健康; opinion 是别人对他的好感加减。性格一样的人互相 +10, 相反的互相 -10。 inherit 是爸妈一个有这个天生特点时孩子也有的机会 (百分之几, 两个都有翻倍; 第 4 块)。childhood 是 3 岁有的「小时候的性格」(照三代的五种): focus 是学哪样学得好, grows_into 是长大以后容易有的性格。 coping 是压力崩溃时染上的排解压力的毛病 (第 8 块, 照三代): 每个让压力降得快 20%, 带一个解压的决议 (decision: 名字、说明、降多少压力、三年一次); stress 是崩溃得重了才有的特点 (忧郁、疯癫)。 physical 是受了伤、被刺瞎、被阉这些身体上的 (照三代的数字; 第 9 块以后「对犯人的处置」): fertility 是生育乘多少, recover 是每年好一档的机会, no_heir 不能继承也不能有宣称, no_marry 不能再结婚。",
  "skills": [
   {
    "id": "diplomacy",
@@ -1043,6 +1043,82 @@
    },
    "opinion": -10,
    "desc": "疯疯癫癫, 有时候说胡话、做怪事"
+  }
+ ],
+ "physical": [
+  {
+   "id": "blind",
+   "name": "瞎子",
+   "desc": "眼睛被刺瞎了",
+   "skills": {
+    "martial": -6,
+    "stewardship": -2,
+    "intrigue": -2,
+    "prowess": -10
+   },
+   "opinion": -10,
+   "health": -0.25
+  },
+  {
+   "id": "eunuch",
+   "name": "阉人",
+   "desc": "被阉了: 不能再结婚, 不能生孩子, 不能继承也不能有宣称 (已经结了的婚不拆)",
+   "opinion": -10,
+   "fertility": 0.0,
+   "no_heir": true,
+   "no_marry": true
+  },
+  {
+   "id": "beardless_eunuch",
+   "name": "无须阉人",
+   "desc": "小时候就被阉了: 不长胡子, 不能结婚, 不能生孩子, 不能继承也不能有宣称",
+   "skills": {
+    "prowess": -4
+   },
+   "opinion": -10,
+   "fertility": 0.0,
+   "no_heir": true,
+   "no_marry": true
+  },
+  {
+   "id": "wounded",
+   "name": "受伤",
+   "desc": "身上有伤, 会慢慢好",
+   "skills": {
+    "martial": -1,
+    "intrigue": -1,
+    "prowess": -2
+   },
+   "health": -1.0,
+   "recover": 0.4
+  },
+  {
+   "id": "severely_injured",
+   "name": "重伤",
+   "desc": "伤得很重, 好起来要很久",
+   "skills": {
+    "martial": -2,
+    "intrigue": -2,
+    "prowess": -4
+   },
+   "opinion": -10,
+   "fertility": 0.75,
+   "health": -2.0,
+   "recover": 0.2
+  },
+  {
+   "id": "brutally_mauled",
+   "name": "遍体鳞伤",
+   "desc": "浑身是伤, 再受一点伤就没命了",
+   "skills": {
+    "martial": -4,
+    "intrigue": -4,
+    "prowess": -8
+   },
+   "opinion": -20,
+   "fertility": 0.25,
+   "health": -4.0,
+   "recover": 0.1
   }
  ]
 }

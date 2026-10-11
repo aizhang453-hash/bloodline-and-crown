@@ -42,7 +42,17 @@ func phase_days(s: Dictionary) -> float:
 	var p: Person = w.people[s.owner]
 	if s.kind == "sway":
 		return maxf(Schemes.SWAY_MIN, Schemes.SWAY_DAYS - Schemes.SWAY_PER_SKILL * _skill(p, "diplomacy"))
-	return maxf(Schemes.PHASE_MIN, Schemes.PHASE_DAYS - Schemes.PHASE_PER_SKILL * _skill(p, "intrigue"))
+	# 第 9 块: 你的密探头子「支持阴谋」快一些; 对方的密探头子「破坏阴谋」慢一些
+	var days := maxf(Schemes.PHASE_MIN, Schemes.PHASE_DAYS - Schemes.PHASE_PER_SKILL * _skill(p, "intrigue") - Councils.SUPPORT_DAYS * w.council.task_skill(p, "support"))
+	var guard := _disrupt(s)
+	if guard > 0:
+		days += Councils.DISRUPT_DAYS + Councils.DISRUPT_PER * guard
+	return days
+
+
+## 保护目标的密探头子在「破坏阴谋」的本事 (0 = 没有)
+func _disrupt(s: Dictionary) -> int:
+	return w.council.task_skill(w.council.protector(w.people[s.target]), "disrupt")
 
 
 ## 内应跟目标多亲: [说明, 加多少]
@@ -102,6 +112,9 @@ func success(s: Dictionary) -> Dictionary:
 		parts.append(["正在跟他打仗, 他防得严", Schemes.AT_WAR])
 	if int(s.breaches) > 0:
 		parts.append(["走漏了 %d 次" % int(s.breaches), Schemes.BREACH_SUCCESS * int(s.breaches)])
+	var sup := w.council.task_skill(p, "support")
+	if sup > 0:
+		parts.append(["你的密探头子在支持阴谋", Councils.SUPPORT_SUCCESS + Councils.SUPPORT_PER * sup])
 	var total := 0.0
 	for x in parts:
 		total += x[1]
@@ -127,6 +140,7 @@ func secrecy(s: Dictionary) -> float:
 				v += 5.0
 			if ag.has_trait("honest"):
 				v -= 5.0
+	v -= Councils.DISRUPT_SECRECY * _disrupt(s)
 	return clampf(v, Schemes.SECRECY_MIN, Schemes.SECRECY_MAX)
 
 
@@ -432,7 +446,7 @@ func _ai_schemes(day: int, events: Array) -> void:
 			if int(m.value) > -30 or not w.people.has(m.who):
 				continue
 			var t: Person = w.people[m.who]
-			if t.alive and w.rng.randf() < 1.0 / 120.0 and p.opinion_of(t).total <= -60 and start_problem(p, t, "murder") == "":
+			if t.alive and w.rng.randf() < 1.0 / 120.0 * _fear_factor(p, t) and p.opinion_of(t).total <= -60 and start_problem(p, t, "murder") == "":
 				var r := start(p, t, "murder", day, events)
 				if r.ok:
 					_ai_agents(schemes[r.scheme], day)
@@ -447,7 +461,7 @@ func _ai_schemes(day: int, events: Array) -> void:
 		for q in w.house_members(k.house):
 			if q == h or q == k or q.id == w.player or not q.has_trait("ambitious") or q.female or not q.adult(day):
 				continue
-			if w.rng.randf() < 1.0 / 240.0 and start_problem(q, h, "murder") == "" and q.opinion_of(h).total < 10:
+			if w.rng.randf() < 1.0 / 240.0 * _fear_factor(q, k) and start_problem(q, h, "murder") == "" and q.opinion_of(h).total < 10:
 				var r := start(q, h, "murder", day, events)
 				if r.ok:
 					_ai_agents(schemes[r.scheme], day)
@@ -458,6 +472,16 @@ func _ai_schemes(day: int, events: Array) -> void:
 		for v in w.vassals_of(k):
 			if v.id != w.player and (v.has_trait("ambitious") or v.has_trait("gregarious")) and w.rng.randf() < 1.0 / 120.0 and start_problem(v, k, "sway") == "":
 				start(v, k, "sway", day, events)
+
+
+## 怕不怕 (照三代「恐惧」): 吓坏了的人根本不敢动手, 怕的人少四分之三
+func _fear_factor(p: Person, t: Person) -> float:
+	match p.fear_of(t):
+		2:
+			return 0.0
+		1:
+			return 0.25
+	return 1.0
 
 
 ## 电脑开始阴谋时拉两个肯来的内应

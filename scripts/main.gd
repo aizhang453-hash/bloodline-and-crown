@@ -130,9 +130,10 @@ func handle_events(events: Array) -> void:
 				else:
 					var dead: Person = world.people[e.dead]
 					var heir: Person = world.people[e.heir]
-					var text := ("%s国王%s让位, %s继位" if e.get("abdicated", false) else "%s国王%s去世了, %s继位") % [e.realm_name, dead.name, heir.name]
+					var king_word := "女王" if dead.female else "国王"
+					var text := ("%s%s%s让位, %s继位" if e.get("abdicated", false) else "%s%s%s去世了, %s继位") % [e.realm_name, king_word, dead.name, heir.name]
 					if e.type == "extinct":
-						text = "%s国王%s去世, 家族绝后, 贵族推举%s当了国王" % [e.realm_name, dead.name, heir.name]
+						text = "%s%s%s去世, 家族绝后, 贵族推举%s当了国王" % [e.realm_name, king_word, dead.name, heir.name]
 					for sp in e.splits:
 						text += "; %s分到了%s" % [world.people[sp[1]].name, world.realm_name(sp[0])]
 					hud.notify(text)
@@ -146,6 +147,11 @@ func handle_events(events: Array) -> void:
 				_on_scheme_event(e)
 			"story", "mental_break", "title", "danelaw_ask":
 				map_changed = _on_story_event(e) or map_changed
+			"council_left":
+				hud.notify("%s不再是你的%s了 (%s), 位子空着" % [world.people[e.person].name, e.seat, e.why])
+			"council_done":
+				hud.notify(e.text)
+				map_changed = map_changed or e.get("map", false)
 	if map_changed:
 		map.refresh_colors()
 	if not events.is_empty():

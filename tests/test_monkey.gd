@@ -73,6 +73,11 @@ func test_random_play() -> void:
 						hud._open_schemes_window()  # 阴谋 (第 7 块)
 					elif r < 0.35:
 						hud._open_decisions()  # 决议 (第 8 块)
+					elif r < 0.42:
+						# 议会 (第 9 块): 打开议会, 有时换人、换活
+						hud._open_council_window()
+						if not hud.window.is_empty() and rng.randf() < 0.5:
+							hud._council_click(rng.randi_range(0, 4), rng.randf() < 0.5)
 					elif r < 0.4:
 						# 军队 (第 6 块): 打开军队窗口, 有时选中自己的军队
 						hud._open_army_window()
@@ -104,7 +109,7 @@ func test_random_play() -> void:
 		check(hud.player == "" or main.world.realms.has(hud.player), "玩家的国家是真的")
 		check(hud.player != "" or clock.paused, "没选国王时间不走")
 		check(main.world.player == hud.player_id or clock.paused, "世界知道玩家是谁")
-		check(hud.window.is_empty() or hud.window.kind in ["realm", "grant", "army", "war", "commander", "schemes", "scheme", "agents", "decisions"] or hud.person_id == hud.window.person, "说亲、教育、互动、宣战的窗口跟着人物窗口")
+		check(hud.window.is_empty() or hud.window.kind in ["realm", "grant", "army", "war", "commander", "schemes", "scheme", "agents", "decisions", "council", "council_pick", "council_task", "council_target"] or hud.person_id == hud.window.person, "说亲、教育、互动、宣战的窗口跟着人物窗口")
 		for a in main.world.warfare.armies.values():
 			check(a.levy >= 0.0 and a.special >= 0.0, "军队的人数不是负数")
 			check(main.world.by_id.has(a.loc), "军队在一块真的地上")

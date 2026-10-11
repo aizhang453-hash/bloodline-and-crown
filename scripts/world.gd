@@ -33,6 +33,7 @@ var history_reinforcements: Array = []  # 史料里维京人的援兵 [{year, mo
 var warfare: Warfare               # 打仗 (第 6 块)
 var intrigue: Intrigue             # 阴谋 (第 7 块)
 var story: StoryEvents             # 随机事件和压力崩溃 (第 8 块)
+var council: Councils              # 议会 (第 9 块)
 var history_schemes: Array = []    # 史料里的阴谋 [{year, month, schemer, target, kind, note}] (872 年阿特加尔被杀)
 var rules := Rules.defaults()  # 开局设置 (照三代的游戏规则; 开局前选好)
 var generated_by := {}         # 开局生成的家人: 一家之主的 id -> [妻子、孩子的 id] (「只给电脑」时玩家选的人要拿掉)
@@ -195,6 +196,10 @@ func _load(data: Dictionary, map: Dictionary, p_names: Dictionary, name_seed: in
 	warfare.build_graph()
 	intrigue = Intrigue.new(self)
 	story = StoryEvents.new(self)
+	council = Councils.new(self)
+	var council_rng := RandomNumberGenerator.new()
+	council_rng.seed = name_seed * 31 + 9
+	council.setup(council_rng)
 	for c in counties:
 		c.garrison = warfare.max_garrison(c)
 	warfare.monthly_history_only(start_day)  # 开局就在打的仗 (867 年 1 月)
@@ -223,7 +228,7 @@ func to_save() -> Dictionary:
 	for c in counties:
 		cs.append([c.holder, c.lord, c.occupier, c.garrison])
 	return {"name_seed": name_seed, "today": today, "player": player, "rules": rules, "warfare": warfare.to_save(), "intrigue": intrigue.to_save(),
-			"dejure": dejure_changes, "story": story.to_save(),
+			"dejure": dejure_changes, "story": story.to_save(), "council": council.to_save(),
 			"next_index": _next_index, "next_id": _next_id, "rng_seed": str(rng.seed), "rng_state": str(rng.state),
 			"realm_order": realm_order, "realms": rs, "houses": hs, "counties": cs, "people": ps}
 
@@ -272,6 +277,7 @@ static func from_save(s: Dictionary) -> World:
 	for d in s.get("dejure", {}):
 		w._set_dejure(d, s.dejure[d])
 	w.story.from_save(s.get("story", {}))
+	w.council.from_save(s.get("council", {}))
 	return w
 
 
@@ -508,7 +514,14 @@ func ruler(realm_id: String) -> Person:
 ## 国家的全称, 比如「威塞克斯国王 埃塞尔雷德一世」
 func ruler_text(realm_id: String) -> String:
 	var r: Dictionary = realms[realm_id]
-	return "%s %s" % [r.title, r.ruler]
+	return "%s %s" % [gendered(r.title, ruler(realm_id).female), r.ruler]
+
+
+## 女人当统治者时的叫法: 国王 → 女王, 皇帝 → 女皇 (国家头衔里存的还是男的叫法)
+static func gendered(title: String, female: bool) -> String:
+	if not female:
+		return title
+	return title.replace("皇帝", "女皇").replace("至尊王", "至尊女王").replace("国王", "女王").replace("之王", "之女王")
 
 
 ## 国家的名字 (头衔去掉最后的「国王」「首领」这些), 用在地图上
@@ -625,8 +638,18 @@ func _monthly(month: int, events: Array) -> void:
 			p.conditions = p.conditions.filter(func(c: Dictionary) -> bool: return int(c.until) > day)
 		if not p.boons.is_empty():
 			p.boons = p.boons.filter(func(c: Dictionary) -> bool: return int(c.until) > day)
+		var nd: float = p.natural_dread()
+		if p.dread != nd:
+			p.dread = move_toward(p.dread, nd, DREAD_DRIFT)
+		for t in p.physical():
+			var rec: float = Traits.get_trait(t).get("recover", 0.0)
+			if rec > 0.0 and rng.randf() < rec / 12.0:
+				p.traits.erase(t)
+				var down: String = WOUNDS[maxi(0, WOUNDS.find(t) - 1)] if WOUNDS.find(t) > 0 else ""
+				if down != "":
+					p.traits.append(down)  # 好了一档
 		if p.tyranny > 0.0:
-			p.tyranny = maxf(0.0, p.tyranny - Feudal.TYRANNY_DECAY)
+			p.tyranny = maxf(0.0, p.tyranny - Feudal.TYRANNY_DECAY * (1.0 + Councils.DOMESTIC_TYRANNY * council.task_skill(p, "domestic")))
 		if p.prisoner_of != "" and rng.randf() < Feudal.escape_chance(p, day):
 			events.append({"type": "escape", "person": p.id, "jailer": p.prisoner_of, "day": day})
 			p.prisoner_of = ""
@@ -652,6 +675,7 @@ func _monthly(month: int, events: Array) -> void:
 	_ai_grants(day, events)
 	warfare.monthly(day, events)
 	intrigue.monthly(day, events)
+	council.monthly(day, events)
 	Decisions.ai_monthly(self, day, events)
 	story.monthly(day, events)
 
@@ -806,12 +830,16 @@ func _set_ruler(realm_id: String, p: Person) -> void:
 ## 从一个国家里分出一个王国 (平分继承), 给 son; 返回新国家的 id
 func _split_realm(realm_id: String, title: String, son: Person) -> String:
 	var parent: Dictionary = realms[realm_id]
+	# 儿子原来是封臣的话, 先把他原来的封地传给他的继承人 (不然分出去的地跟他原来的地搅在一起, 主人和国家对不上; 2026-10-11 修)
+	if son.liege_realm != "" and not lands_of(son).is_empty():
+		_hand_down(son, today, [])
 	var id := "%s_%d" % [title, _next_index]
 	var c: Color = parent.color
 	var realm := {
 		"id": id, "title": duchies[title].name + "国王", "culture": parent.culture, "house": son.house, "ruler_id": son.id, "ruler": son.name,
 		"color": Color.from_hsv(fmod(c.h + 0.07 * (1 + _next_index % 3), 1.0), c.s, clampf(c.v * 0.9, 0.3, 0.9)),
 		"random": false, "index": _next_index, "titles": [title], "viceroys": {}, "capital": "",
+		"gender_law": parent.get("gender_law", "male_only"),
 	}
 	_next_index += 1
 	realms[id] = realm
@@ -1005,6 +1033,8 @@ func _new_child(father: Person, mother: Person, day: int, force_female := -1) ->
 	p.name = doc.name if not doc.is_empty() else random_name(rng, p.culture, p.female)
 	p.note = doc.get("note", "")
 	p.house = father.house if father and father.house != "" else mother.house
+	if mother.matrilineal and mother.house != "":
+		p.house = mother.house  # 随母婚: 孩子算母亲的家族 (照三代)
 	p.homeland = father.homeland if father else mother.homeland
 	p.birth_day = day
 	p.rank = "noble" if (father and father.rank != "") or mother.rank != "" else ""
@@ -1073,13 +1103,15 @@ func me() -> Person:
 	return people.get(player) if player != "" else null
 
 
-func marry(a: Person, b: Person, day: int, events: Array, note := "") -> void:
+## matri: 随母婚 (照三代: 孩子算女方家族; 女统治者、女继承人这样嫁)
+func marry(a: Person, b: Person, day: int, events: Array, note := "", matri := false) -> void:
 	var before_a := kin_realm(a)
 	var before_b := kin_realm(b)
 	_marriage_prestige(a, b)
 	var husband := a if not a.female else b
 	var wife := b if husband == a else a
 	var second := husband.married()  # 爱尔兰古法: 已经有正妻, 这个是次妻
+	wife.matrilineal = matri
 	for pair in [[husband, wife], [wife, husband]]:
 		var x: Person = pair[0]
 		if x == husband and second:
@@ -1095,7 +1127,7 @@ func marry(a: Person, b: Person, day: int, events: Array, note := "") -> void:
 	if before_a != "" and before_b != "" and before_a != before_b:
 		alliance = [before_a, before_b]
 	events.append({"type": "marriage", "husband": husband.id, "wife": wife.id, "day": day, "history": note,
-			"alliance": alliance, "secondary": second})
+			"alliance": alliance, "secondary": second, "matri": matri})
 
 
 ## 正妻去世: 最早娶的次妻当正妻
@@ -1146,19 +1178,20 @@ func _betrothals_due(day: int, events: Array) -> void:
 		if not (p.adult(day) and other.adult(day)):
 			continue
 		if Marriage.problem(self, p, other, day) == "":
-			marry(p, other, day, events)
+			marry(p, other, day, events, "", other.matrilineal)  # 订婚时说好的随母婚
 		else:
 			p.betrothed = ""
 			other.betrothed = ""
 
 
 ## 玩家给自家的人说亲: 对方答应就结婚 (有一个不满 16 岁就订婚)。返回 {ok, text}
-func propose(mine: Person, theirs: Person, day: int, events: Array) -> Dictionary:
+func propose(mine: Person, theirs: Person, day: int, events: Array, matri := false) -> Dictionary:
 	var betrothal := not (mine.adult(day) and theirs.adult(day))
 	var why := Marriage.problem(self, mine, theirs, day, betrothal)
 	if why != "":
 		return {"ok": false, "text": why}
-	var acc := Marriage.acceptance(self, me(), mine, theirs, day)
+	matri = matri and mine.female
+	var acc := Marriage.acceptance(self, me(), mine, theirs, day, matri)
 	if acc.total <= 0:
 		return {"ok": false, "text": "%s家不答应 (鼠标指着那一行看为什么)" % theirs.name}
 	if acc.get("hook", 0) > 0 and acc.total - int(acc.hook) <= 0:
@@ -1169,9 +1202,10 @@ func propose(mine: Person, theirs: Person, day: int, events: Array) -> Dictionar
 		_register(theirs)
 	if betrothal:
 		betroth(mine, theirs, day, events)
-		return {"ok": true, "text": "%s和%s订婚了, 两个人都满 16 岁就成亲" % [mine.name, theirs.name]}
-	marry(mine, theirs, day, events)
-	return {"ok": true, "text": "%s和%s结婚了" % [mine.name, theirs.name]}
+		mine.matrilineal = matri
+		return {"ok": true, "text": "%s和%s订婚了, 两个人都满 16 岁就成亲%s" % [mine.name, theirs.name, " (随母婚)" if matri else ""]}
+	marry(mine, theirs, day, events, "", matri)
+	return {"ok": true, "text": "%s和%s结婚了%s" % [mine.name, theirs.name, " (随母婚: 孩子算%s家的)" % house_name(mine.house) if matri else ""]}
 
 
 ## 本地贵族家的人 (随机生成的, 还没放进世界; 说亲选上了才放进去)
@@ -1269,7 +1303,9 @@ func _ai_marriages(day: int, events: Array) -> void:
 			best = make_noble(seeker.culture, not seeker.female, their_age, day)
 			best.homeland = seeker.homeland
 			_register(best)
-		marry(seeker, best, day, events)
+		# 女统治者、有领地的女人、女继承人: 随母婚 (照三代, 不然孩子算丈夫家, 继承就断了)
+		var wife: Person = best if not seeker.female else seeker
+		marry(seeker, best, day, events, "", wife.realm != "" or is_landed(wife) or heirs.has(wife.id))
 
 
 ## 电脑给谁说亲: 国王本人、国王的孩子和兄弟姐妹、继承人 (孙子侄子这些等他父亲当了国王再说, 不然人太多)
@@ -1540,14 +1576,14 @@ func vassals_of(p: Person) -> Array:
 ## 头衔: 「威塞克斯国王」「伯克郡郡长」「肯特副王」; 没领地是空的
 func title_of(p: Person) -> String:
 	if p.realm != "" and realms.has(p.realm):
-		return realms[p.realm].title
+		return gendered(realms[p.realm].title, p.female)
 	var d := viceroy_duchy(p)
 	if d != "":
 		return duchies[d].name + "副王"
 	var ls := lands_of(p)
 	if ls.is_empty():
 		return ""
-	return ls[0].name + Feudal.kind(self, p.liege_realm)
+	return gendered(ls[0].name + Feudal.kind(self, p.liege_realm), p.female)
 
 
 func vassal_kind(p: Person) -> String:
@@ -1568,7 +1604,7 @@ func income(p: Person, memo: Dictionary = {}) -> Dictionary:
 		if c.occupier == "":
 			held += 1
 	var active := mini(held, limit)
-	var own_gold := active * Feudal.GOLD_PER_COUNTY
+	var own_gold: float = active * Feudal.GOLD_PER_COUNTY * (1.0 + Councils.TAX_PER * council.task_skill(p, "taxes"))
 	var own_levy := active * Feudal.LEVY_PER_COUNTY
 	var from_gold := 0.0
 	var from_levy := 0
@@ -1631,7 +1667,7 @@ func _hand_down(p: Person, day: int, events: Array) -> void:
 	var lands := lands_of(p)
 	var vice := viceroy_duchy(p)
 	var law := Succession.law_of(p.culture)
-	var heirs: Array = Succession.candidates_for(self, p, law, day).filter(func(h: Person) -> bool:
+	var heirs: Array = Succession.candidates_for(self, p, law, day, gender_law(rid)).filter(func(h: Person) -> bool:
 		return h.alive and h.realm == "" and h.prisoner_of == "" and (h.liege_realm == "" or h.liege_realm == rid or lands_of(h).is_empty()))
 	_move_prisoners(p, heirs[0] if not heirs.is_empty() else liege)
 	if heirs.is_empty():
@@ -1859,11 +1895,21 @@ func execute(jailer: Person, prisoner: Person, day: int, events: Array) -> Dicti
 	if not Feudal.has_crime(prisoner, day):
 		jailer.tyranny += Feudal.TYRANNY_EXECUTE
 	jailer.add_stress(execute_stress(jailer, prisoner, day))
+	jailer.dread = minf(100.0, jailer.dread + execute_dread(jailer, prisoner))
 	for f in _close_family(prisoner):
 		f.remember(jailer.id, "处死了我的家人", -50, day + 30 * GameDate.YEAR_DAYS)
 	var name := prisoner.name
 	kill(prisoner, day, events, "被处死了")
 	return {"ok": true, "text": "处死了%s" % name}
+
+
+## 处死涨多少恐惧 (照三代: 国王、有实力的封臣、你的上级 15; 有领地的、你的近亲 10; 别人 5)
+func execute_dread(jailer: Person, prisoner: Person) -> float:
+	if prisoner.realm != "" or liege_of(jailer) == prisoner or council.powerful_vassals(jailer).has(prisoner):
+		return 15.0
+	if is_landed(prisoner) or _close_family(jailer).has(prisoner):
+		return 10.0
+	return 5.0
 
 
 ## 处死人违背性格涨压力 (第 8 块): 仁慈 +30、宽恕 +20, 没罪的还让公正的 +20; 残忍的反而 -10
@@ -2404,3 +2450,263 @@ func _close_family(p: Person) -> Array:
 		if c.alive and not list.has(c):
 			list.append(c)
 	return list
+
+
+# ---- 对犯人的处置 (用户 2026-10-11 要的, 照三代; 规矩在看板「加: 对犯人的处置」) ----
+
+const DREAD_DRIFT := 0.5           # 恐惧每月往本来的恐惧走多少 (照三代)
+const WOUNDS := ["wounded", "severely_injured", "brutally_mauled"]   # 伤的三档 (照三代: 最重了再受伤会死)
+const CRUEL_OPINION := -50         # 刺瞎、阉割、用刑: 他好感 -50 记 50 年, 他家里人 -20 记 20 年 (照三代)
+const CRUEL_FAMILY := -20
+const TORTURE_CONFESS := 0.5       # 用刑招出一个秘密的机会 (我们定的)
+const TORTURE_COOLDOWN := 30       # 同一个人隔多少天才能再用刑 (我们定的, 免得一下子点死)
+const ASK_ACCEPT := 0.5            # 逼他出家、流放: 他肯的机会 (我们定的)
+const ASK_YEARS := 1               # 不肯的话隔多久能再逼
+const BANISH_TYRANNY := 5.0        # 没理由流放算暴政 (照三代)
+
+
+## 能不能这样处置他: 空 = 能。kind: torture / blind / castrate / vows / banish
+func punish_problem(jailer: Person, prisoner: Person, kind: String) -> String:
+	if prisoner.prisoner_of != jailer.id:
+		return "%s没关在你的大牢里" % prisoner.name
+	if not jailer.adult(today):
+		return "你还没成年"
+	match kind:
+		"torture":
+			if not prisoner.dungeon:
+				return "要先关进地牢"
+			if not prisoner.adult(today):
+				return "他还是个孩子"
+			if today - int(prisoner.decision_used.get("tortured", -100000)) < TORTURE_COOLDOWN:
+				return "刚用过刑, 过些日子再说"
+		"blind":
+			if prisoner.has_trait("blind"):
+				return "他已经瞎了"
+			if not prisoner.adult(today):
+				return "他还是个孩子"
+		"castrate":
+			if prisoner.female:
+				return "只能对男人"
+			if prisoner.has_trait("eunuch") or prisoner.has_trait("beardless_eunuch"):
+				return "他已经被阉了"
+		"vows":
+			if Marriage.faith_of(jailer.culture) != "christian" or Marriage.faith_of(prisoner.culture) != "christian":
+				return "要你们都是基督徒 (有修道院)"
+			if prisoner.clergy:
+				return "他已经是修士了"
+			if prisoner.realm != "":
+				return "他是国王 (只能放、要赎金或者处死)"
+			if prisoner.age(today) < 10:
+				return "他还太小 (10 岁以上)"
+			if relation(jailer, prisoner) == "" and (prisoner.house == "" or prisoner.house != jailer.house) and home_realm(prisoner) != realm_of_person(jailer):
+				return "只能逼你的亲戚或者住在你宫廷的人"
+			if today - int(prisoner.decision_used.get("asked_vows", -100000)) < ASK_YEARS * GameDate.YEAR_DAYS:
+				return "他刚拒绝过, 过一年再逼"
+		"banish":
+			if prisoner.id == jailer.spouse:
+				return "不能流放你的配偶"
+			if prisoner.realm != "":
+				return "他是别国的国王 (只能放、要赎金或者处死)"
+			if home_realm(prisoner) != realm_of_person(jailer):
+				return "他不是你国家里的人"
+			if today - int(prisoner.decision_used.get("asked_banish", -100000)) < ASK_YEARS * GameDate.YEAR_DAYS:
+				return "他刚拒绝过, 过一年再说"
+	return ""
+
+
+## 刺瞎、阉割、用刑: 他和他家里人恨你, 你的恐惧涨, 你的压力看性格 (都照三代)
+func _cruelty(jailer: Person, prisoner: Person, text: String, day: int) -> void:
+	prisoner.remember(jailer.id, text, CRUEL_OPINION, day + 50 * GameDate.YEAR_DAYS)
+	for f in _close_family(prisoner):
+		if f != jailer:
+			f.remember(jailer.id, "%s我的家人" % text.replace("我", ""), CRUEL_FAMILY, day + 20 * GameDate.YEAR_DAYS)
+	jailer.dread = minf(100.0, jailer.dread + cruelty_dread(jailer, prisoner))
+	jailer.add_stress(cruelty_stress(jailer))
+
+
+## 刺瞎、阉割、用刑涨多少恐惧 (照三代: 国王和国王的近亲、你自己的近亲 30; 有领地的人和他的近亲 20; 别人 10)
+func cruelty_dread(jailer: Person, prisoner: Person) -> float:
+	if prisoner.realm != "" or _close_family(jailer).has(prisoner):
+		return 30.0
+	for f in _close_family(prisoner):
+		if f.realm != "":
+			return 30.0
+	if is_landed(prisoner):
+		return 20.0
+	for f in _close_family(prisoner):
+		if is_landed(f):
+			return 20.0
+	return 10.0
+
+
+## 刺瞎、阉割、用刑违背性格涨的压力 (照三代: 残忍 -15; 仁慈 +100、怯懦 +80; 公正、宽恕、慷慨 +40; 轻信、外向、冷静、知足、诚实 +20)
+static func cruelty_stress(jailer: Person) -> float:
+	var v := 0.0
+	for t in [["sadistic", -15.0], ["compassionate", 100.0], ["craven", 80.0], ["just", 40.0], ["forgiving", 40.0], ["generous", 40.0],
+			["trusting", 20.0], ["gregarious", 20.0], ["calm", 20.0], ["content", 20.0], ["honest", 20.0]]:
+		if jailer.has_trait(t[0]):
+			v += t[1]
+	return v
+
+
+## 受一次伤: 没伤 → 受伤 → 重伤 → 遍体鳞伤 → 死 (照三代)。返回 true = 死了
+func wound(p: Person, day: int, events: Array, cause: String) -> bool:
+	var lv := -1
+	for i in WOUNDS.size():
+		if p.has_trait(WOUNDS[i]):
+			lv = i
+	if lv == WOUNDS.size() - 1:
+		kill(p, day, events, cause)
+		return true
+	if lv >= 0:
+		p.traits.erase(WOUNDS[lv])
+	p.traits.append(WOUNDS[lv + 1])
+	return false
+
+
+func torture(jailer: Person, prisoner: Person, day: int, events: Array) -> Dictionary:
+	var why := punish_problem(jailer, prisoner, "torture")
+	if why != "":
+		return {"ok": false, "text": why}
+	prisoner.decision_used["tortured"] = day
+	if not Feudal.has_crime(prisoner, day):
+		jailer.tyranny += Feudal.TYRANNY_EXECUTE
+	_cruelty(jailer, prisoner, "对我用刑", day)
+	var name := prisoner.name
+	var said := ""
+	if rng.randf() < TORTURE_CONFESS:
+		var hidden: Array = prisoner.secrets.filter(func(s: Dictionary) -> bool: return not s.exposed and not s.known.has(jailer.id))
+		if not hidden.is_empty():
+			var sec: Dictionary = hidden[rng.randi_range(0, hidden.size() - 1)]
+			sec.known.append(jailer.id)
+			said = "; 他招了: " + intrigue.secret_text(prisoner, sec)
+		else:
+			said = "; 他没什么可招的"
+	else:
+		said = "; 他咬紧牙关, 什么都没说"
+	if wound(prisoner, day, events, "受刑死了"):
+		return {"ok": true, "text": "%s受不住刑, 死在了地牢里%s" % [name, said]}
+	return {"ok": true, "text": "对%s用了刑, 他%s%s" % [name, Traits.get_trait(prisoner.physical().filter(func(t: String) -> bool: return WOUNDS.has(t))[0]).name, said]}
+
+
+func blind(jailer: Person, prisoner: Person, day: int) -> Dictionary:
+	var why := punish_problem(jailer, prisoner, "blind")
+	if why != "":
+		return {"ok": false, "text": why}
+	prisoner.traits.append("blind")
+	_cruelty(jailer, prisoner, "刺瞎了我", day)
+	return {"ok": true, "text": "刺瞎了%s" % prisoner.name}
+
+
+func castrate(jailer: Person, prisoner: Person, day: int) -> Dictionary:
+	var why := punish_problem(jailer, prisoner, "castrate")
+	if why != "":
+		return {"ok": false, "text": why}
+	prisoner.traits.append("beardless_eunuch" if prisoner.age(day) < 12 else "eunuch")
+	prisoner.betrothed = ""
+	prisoner.claims.clear()
+	prisoner.weak_claims.clear()
+	_kin_dirty = true
+	_cruelty(jailer, prisoner, "阉了我", day)
+	return {"ok": true, "text": "阉了%s: 他不能再结婚、生孩子, 也不能继承了" % prisoner.name}
+
+
+## 逼他出家: 他可能不肯 (好色、愤世的更不肯); 肯了就放出来进修道院, 当修士 (不结婚、不继承、宣称没了; 有领地的照继承法传下去)
+func force_vows(jailer: Person, prisoner: Person, day: int, events: Array) -> Dictionary:
+	var why := punish_problem(jailer, prisoner, "vows")
+	if why != "":
+		return {"ok": false, "text": why}
+	if rng.randf() >= vows_chance(prisoner):
+		prisoner.decision_used["asked_vows"] = day
+		return {"ok": false, "text": "%s不肯出家, 还关着 (过一年能再逼)" % prisoner.name}
+	_free_and_strip(prisoner, day, events)
+	prisoner.clergy = true
+	prisoner.court = ""
+	return {"ok": true, "text": "%s剃了头, 进修道院当了修士" % prisoner.name}
+
+
+func vows_chance(prisoner: Person) -> float:
+	var c := ASK_ACCEPT
+	if prisoner.has_trait("lustful") or prisoner.has_trait("cynical"):
+		c -= 0.3
+	return clampf(c, 0.05, 0.95)
+
+
+## 流放: 他可能不肯 (有罪的容易肯); 肯了就放出来, 地照继承法传下去, 钱没收, 赶到别的国家住; 没理由流放算暴政 +5
+func banish(jailer: Person, prisoner: Person, day: int, events: Array) -> Dictionary:
+	var why := punish_problem(jailer, prisoner, "banish")
+	if why != "":
+		return {"ok": false, "text": why}
+	var guilty := Feudal.has_crime(prisoner, day)
+	if rng.randf() >= banish_chance(prisoner, day):
+		prisoner.decision_used["asked_banish"] = day
+		return {"ok": false, "text": "%s不肯走, 还关着 (过一年能再说)" % prisoner.name}
+	if not guilty:
+		jailer.tyranny += BANISH_TYRANNY
+	var gold := maxf(0.0, prisoner.gold)
+	jailer.gold += gold
+	prisoner.gold -= gold
+	var mine := realm_of_person(jailer)
+	if is_landed(prisoner):
+		_hand_down(prisoner, day, events)
+	prisoner.prisoner_of = ""
+	prisoner.dungeon = false
+	prisoner.liege_realm = ""
+	var away: Array = realm_order.filter(func(r: String) -> bool: return r != mine and realms.has(r))
+	prisoner.court = ("r:" + away[rng.randi_range(0, away.size() - 1)]) if not away.is_empty() else ""
+	prisoner.remember(jailer.id, "把我赶出了国", -20, day + 10 * GameDate.YEAR_DAYS)
+	intrigue.give_hook(jailer, prisoner)
+	_feudal_dirty = true
+	_kin_dirty = true
+	var where := realm_name(prisoner.court.substr(2)) if prisoner.court != "" else "外乡"
+	return {"ok": true, "text": "把%s赶出了国 (去了%s), 没收了他 %d 金币%s" % [prisoner.name, where, int(gold), "" if guilty else "; 没理由, 暴政 +%d" % int(BANISH_TYRANNY)]}
+
+
+func banish_chance(prisoner: Person, day: int) -> float:
+	return clampf(ASK_ACCEPT + (0.3 if Feudal.has_crime(prisoner, day) else 0.0), 0.05, 0.95)
+
+
+## 出家: 放出来, 宣称没了; 有领地的照继承法传下去
+func _free_and_strip(p: Person, day: int, events: Array) -> void:
+	if is_landed(p):
+		_hand_down(p, day, events)
+	p.prisoner_of = ""
+	p.dungeon = false
+	p.betrothed = ""
+	p.claims.clear()
+	p.weak_claims.clear()
+	_feudal_dirty = true
+	_kin_dirty = true
+
+
+# ---- 性别法 (用户 2026-10-11 定的, 照三代; 规矩在看板「加: 女人也能继承、当统治者」) ----
+
+const GENDER_LAWS := {"male_only": "只有男人", "male_pref": "男人优先"}
+const GENDER_LAW_COST := 500.0   # 往宽里改 (只有男人 → 男人优先) 花的威望 (照三代); 往严里改不花
+
+
+## 这个国家的性别法: 开局都是「只有男人」(照史实: 9 世纪的不列颠群岛没有女人继承王位)
+func gender_law(rid: String) -> String:
+	return realms[rid].get("gender_law", "male_only") if realms.has(rid) else "male_only"
+
+
+func gender_law_problem(p: Person, law: String) -> String:
+	if p.realm == "" or not realms.has(p.realm):
+		return "只有独立的统治者能改"
+	if not GENDER_LAWS.has(law):
+		return "我们的信仰都是男人主导, 「男女平等」要等第 13 块「宗教」"
+	if gender_law(p.realm) == law:
+		return "现在就是这个"
+	if law == "male_pref" and p.prestige < GENDER_LAW_COST:
+		return "威望不够 (要 %d, 有 %d)" % [int(GENDER_LAW_COST), int(p.prestige)]
+	return ""
+
+
+func change_gender_law(p: Person, law: String) -> Dictionary:
+	var why := gender_law_problem(p, law)
+	if why != "":
+		return {"ok": false, "text": why}
+	if law == "male_pref":
+		p.prestige -= GENDER_LAW_COST
+	realms[p.realm].gender_law = law
+	return {"ok": true, "text": "性别法改成了「%s」%s" % [GENDER_LAWS[law], ": 家里没有能继承的男人时, 女人也能继承" if law == "male_pref" else ""]}

@@ -6,6 +6,8 @@ var w: World
 
 func before_each() -> void:
 	w = World.load_867()
+	w.council.off = true  # 议会 (第 9 块) 的加成在 test_council 里测, 这里量封臣本身的数字
+	w.council.refresh_opinions()
 
 
 func person(id: String) -> Person:
@@ -347,6 +349,7 @@ func test_memories_expire_and_tyranny_decays() -> void:
 
 
 func test_long_run_feudal_consistency() -> void:
+	w.council.off = false  # 长跑要连议会一起 (编造宣称引出的仗)
 	w.rng.seed = 33
 	var day := w.start_day
 	for m in 60 * 12:

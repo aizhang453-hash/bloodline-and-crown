@@ -25,14 +25,18 @@ static func law_of(culture: String) -> String:
 
 ## 能继承的人, 排好先后 (第一个就是继承人)。ruler 是现在的国王 (或者刚死的国王), 他自己不算
 static func candidates(w: World, realm_id: String, ruler: Person, day: int) -> Array:
-	return candidates_for(w, ruler, law_of(w.realms[realm_id].culture), day)
+	return candidates_for(w, ruler, law_of(w.realms[realm_id].culture), day, w.gender_law(realm_id))
 
 
 ## 照 law 这种继承法, 谁来接 holder 的东西 (国王的国家, 或者封臣的领地; 第 5 块)
-static func candidates_for(w: World, ruler: Person, law: String, day: int) -> Array:
+## gender: 性别法 (照三代): male_only 只有男人 (开局都是, 照史实); male_pref 男人优先 (家里没有能继承的男人, 女人也能继承)
+static func candidates_for(w: World, ruler: Person, law: String, day: int, gender := "male_only") -> Array:
 	var house: String = ruler.house
-	var men: Array = w.house_members(house).filter(func(p: Person) -> bool:
-		return p.alive and not p.female and p.id != ruler.id and house != "")
+	var pool: Array = w.house_members(house).filter(func(p: Person) -> bool:
+		return p.alive and p.id != ruler.id and house != "" and p.can_inherit())
+	var men: Array = pool.filter(func(p: Person) -> bool: return not p.female)
+	if men.is_empty() and gender == "male_pref":
+		men = pool  # 男人优先: 一个能继承的男人都没有, 女人也能继承 (排法跟男人一样)
 	match law:
 		"seniority":
 			men.sort_custom(func(a: Person, b: Person) -> bool: return a.birth_day < b.birth_day)

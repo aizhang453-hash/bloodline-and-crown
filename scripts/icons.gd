@@ -568,6 +568,26 @@ static func _pictogram(ci: CanvasItem, name: String, t: Transform2D, col: Color)
 				var a := k * 0.45
 				sp.append(t * (Vector2(0.26, 0.26) + Vector2(cos(a), sin(a)) * (0.01 + k * 0.004)))
 			ci.draw_polyline(sp, Color("c8a0e0"), maxf(1.0, t.get_scale().x * 0.03), true)
+		# ---- 身体上的 (对犯人的处置) ----
+		"p_blind":  # 瞎子: 眼睛上缠着一条布
+			_ellipse(ci, t, Vector2(0, 0.0), Vector2(0.36, 0.2), Color("ece6dc"))
+			_circle(ci, t, Vector2(0, 0.0), 0.12, Color("b9b4ab"))
+			_poly(ci, t, [Vector2(-0.46, -0.16), Vector2(0.46, 0.04), Vector2(0.46, 0.18), Vector2(-0.46, -0.02)], Color("6a5a48"))
+			_line(ci, t, Vector2(0.4, 0.12), Vector2(0.3, 0.42), Color("6a5a48"), 0.06)
+		"p_eunuch", "p_beardless_eunuch":  # 阉人: 空摇篮上一道红杠 (不能生孩子)
+			var rocker := PackedVector2Array()
+			for k in 13:
+				var a := PI * 0.2 + PI * 0.6 * k / 12.0
+				rocker.append(t * (Vector2(cos(a) * 0.44, sin(a) * 0.18 + 0.18)))
+			ci.draw_polyline(rocker, WOOD.lightened(0.2), maxf(2.0, t.get_scale().x * 0.07), true)
+			_poly(ci, t, [Vector2(-0.34, -0.1), Vector2(0.34, -0.1), Vector2(0.28, 0.22), Vector2(-0.28, 0.22)], WOOD)
+			_line(ci, t, Vector2(-0.42, 0.38), Vector2(0.42, -0.38), Color("d04a3a"), 0.08)
+		"p_wounded", "p_severely_injured", "p_brutally_mauled":  # 受伤: 交叉的白布条, 血点越多伤越重
+			_line(ci, t, Vector2(-0.34, -0.3), Vector2(0.34, 0.3), Color("f0ead8"), 0.16)
+			_line(ci, t, Vector2(0.34, -0.3), Vector2(-0.34, 0.3), Color("f0ead8"), 0.16)
+			var n: int = {"p_wounded": 1, "p_severely_injured": 2, "p_brutally_mauled": 3}[name]
+			for k in n:
+				_circle(ci, t, [Vector2(0.0, 0.0), Vector2(-0.24, 0.3), Vector2(0.26, -0.28)][k], 0.08, Color("b02a22"))
 		"p_round_shield":  # 圆盾 (武力)
 			_circle(ci, t, Vector2.ZERO, 0.42, Color("8a5a3a"))
 			for k in 6:

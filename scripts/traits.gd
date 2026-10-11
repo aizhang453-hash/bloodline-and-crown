@@ -29,6 +29,9 @@ static func data() -> Dictionary:
 		for t in _data.get("stress", []):
 			t.kind = "stress"  # 崩溃得重了才有的 (忧郁、疯癫)
 			_by_id[t.id] = t
+		for t in _data.get("physical", []):
+			t.kind = "physical"  # 受伤、瞎了、被阉 (对犯人的处置)
+			_by_id[t.id] = t
 	return _data
 
 

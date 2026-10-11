@@ -99,6 +99,8 @@ class Painter:
 	var age: int
 	var culture: String
 	var rank: String
+	var beardless := false   # 小时候被阉 (不长胡子)
+	var blind := false       # 被刺瞎 (眼睛画成灰白)
 	var skin: Array
 	var hair: Array
 	var top: float      # 头顶
@@ -116,6 +118,8 @@ class Painter:
 		age = who.get("age", 30)
 		culture = Portrait.style(who.get("culture", "anglo_saxon"))
 		rank = who.get("rank", "")
+		beardless = who.get("beardless", false)
+		blind = who.get("blind", false)
 		skin = Portrait.tones(Color(Portrait.SKINS[int(dna.skin)]))
 		hair = Portrait.tones(_hair_color())
 		var young := clampf((18.0 - age) / 12.0, 0.0, 1.0)  # 小孩头大脸圆
@@ -139,7 +143,7 @@ class Painter:
 		_nose()
 		_mouth()
 		_age_lines()
-		if not female and age >= 18:
+		if not female and age >= 18 and not beardless:
 			_beard()
 		if female and culture == "norse":
 			_braids()
@@ -374,7 +378,7 @@ class Painter:
 					px(x, y, hair_at(x, y))
 
 	func _eyes() -> void:
-		var iris := Color(Portrait.EYES[dna.eyes])
+		var iris := Color(Portrait.EYES[dna.eyes]) if not blind else Color("b9b4ab")
 		var lid: Color = skin[1].darkened(0.55)
 		var white := Color("ece6dc")
 		for side in [-1, 1]:

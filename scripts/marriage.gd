@@ -14,6 +14,7 @@ const CHURCH_DEGREES := 7          # 基督徒: 往上数七代内有同一个�
 const INBRED_PER_KINSHIP := 0.3    # 近亲繁殖的机会 = 亲缘系数 × 0.3 (亲兄妹 0.5 → 15%)
 const NORSE := ["norse", "norse_gael"]
 const STATUS_NAMES := ["平民", "贵族", "国王家的人", "国王"]
+const MATRI_ACCEPT := -30         # 随母婚男方肯不肯 (我们定的)
 const IRISH_WIVES := 3             # 爱尔兰古法: 正妻 + 两个次妻
 
 
@@ -176,6 +177,11 @@ static func problem(w: World, a: Person, b: Person, day: int, betrothal := false
 	if a.female == b.female:
 		return "两个人都是%s" % ("女的" if a.female else "男的")
 	for p in [a, b]:
+		if p.clergy:
+			return "%s是修士, 不结婚" % p.name
+		if p.has_trait("eunuch") or p.has_trait("beardless_eunuch"):
+			return "%s是阉人, 不能结婚" % p.name
+	for p in [a, b]:
 		if not free_to_marry(w, p):
 			if max_wives(p) > 1:
 				return "%s已经有 %d 个妻子了 (爱尔兰古法也最多 %d 个)" % [p.name, max_wives(p), max_wives(p)]
@@ -185,13 +191,13 @@ static func problem(w: World, a: Person, b: Person, day: int, betrothal := false
 	if not betrothal and not (a.adult(day) and b.adult(day)):
 		return "还没满 16 岁 (可以先订婚)"
 	if a.realm != "" and b.realm != "":
-		return "两个国王不能结婚 (只有男人当国王)"
+		return "两个统治者不能结婚 (两国合一以后再说)"
 	return kin_problem(w, a, b)
 
 
 ## 女方愿不愿意 (或者男方家愿不愿意) 跟你家结亲: {total, parts}。total > 0 就答应
 ## me 是玩家, mine 是你家的人, theirs 是对方; 对方家里做主的是对方的国王 (没有就是本人)
-static func acceptance(w: World, me: Person, mine: Person, theirs: Person, day: int) -> Dictionary:
+static func acceptance(w: World, me: Person, mine: Person, theirs: Person, day: int, matri := false) -> Dictionary:
 	var parts := []
 	var player_realm := w.realm_of_person(me)
 	var head := w.head_of(theirs)
@@ -226,6 +232,8 @@ static func acceptance(w: World, me: Person, mine: Person, theirs: Person, day: 
 		parts.append(["信的教不一样 (%s / %s)" % [faith_name(faith_of(mine.culture)), faith_name(faith_of(theirs.culture))], -25])
 	if w.historical_match(mine, theirs) != "":
 		parts.append(["两家早有结亲的意思", 30])
+	if matri and mine.female:
+		parts.append(["随母婚: 孩子算你家的 (男人主导的信仰里男方不太肯)", MATRI_ACCEPT])
 	var hook := 0
 	if me != null and head != me and w.intrigue.hook_ready(me, head, day):
 		var strong: bool = w.intrigue.hook_on(me, head).strong

@@ -84,9 +84,10 @@ static func crime_text(p: Person, day: int) -> String:
 	return "、".join(list)
 
 
-## 抓人能不能抓到: 一半 + 你和他密谋本事的差 (每点 3%), 最少 10%, 最多 95%
+## 抓人能不能抓到: 一半 + 你和他密谋本事的差 (每点 3%), 他怕你 +25%、吓坏了 +50% (照三代的「恐惧」); 最少 10%, 最多 95%
 static func arrest_chance(jailer: Person, target: Person, day: int) -> float:
-	return clampf(0.5 + (jailer.skill("intrigue", day) - target.skill("intrigue", day)) * 0.03, 0.1, 0.95)
+	var fear: float = [0.0, 0.25, 0.5][target.fear_of(jailer)]
+	return clampf(0.5 + (jailer.skill("intrigue", day) - target.skill("intrigue", day)) * 0.03 + fear, 0.1, 0.95)
 
 
 ## 关着的人每个月逃跑的机会 (软禁比地牢容易跑; 密谋好的容易跑)

@@ -8,6 +8,10 @@ var wf: Warfare
 func before_each() -> void:
 	w = World.load_867(7, {"wars": "off"})  # 大部分测试不要开局的仗, 自己摆
 	wf = w.warfare
+	w.council.off = true  # 议会 (第 9 块) 的加成在 test_council 里测, 这里量打仗本身的数字
+	w.council.refresh_opinions()
+	for c in w.counties:
+		c.garrison = wf.max_garrison(c)
 
 
 func king(rid: String) -> Person:
@@ -54,7 +58,8 @@ func test_start_state() -> void:
 	eq(os.liege_realm, "northumbria", "住在诺森布里亚")
 	check(w2.warfare.commander_candidates(w2.ruler("northumbria")).has(os), "奥斯伯特能替诺森布里亚带兵")
 	eq(w2.warfare.fort(w2.by_id.york), 3, "约克: 1 + 罗马城墙 + 都城")
-	eq(int(w2.by_id.york.garrison), 300, "守军满的")
+	eq(int(w2.by_id.york.garrison), int(w2.warfare.max_garrison(w2.by_id.york)), "守军满的")
+	check(w2.warfare.max_garrison(w2.by_id.york) >= 300.0, "约克的城墙 3 级 (元帅整顿军队还会多一些)")
 	eq(wf.wars.size(), 0, "开局设置关了「历史上的仗」就没有")
 
 
@@ -193,6 +198,7 @@ func test_early_rout_wipes_army() -> void:
 	a.special = 5000.0
 	b.levy = 300.0
 	b.special = 0.0
+	b.commander = ""  # 没人带兵 (第 9 块起宫廷里多了请来的大臣, 可能有会带兵的)
 	var events := fight(a, b, "skye")
 	check(events.any(func(e: Dictionary) -> bool: return e.type == "battle" and e.wiped), "头 12 天就垮了: 全军覆没")
 	check(wf.army_of(def.id).is_empty(), "军队没了")

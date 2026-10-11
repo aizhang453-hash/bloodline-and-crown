@@ -204,7 +204,10 @@ func fort(c: Dictionary) -> int:
 
 
 func max_garrison(c: Dictionary) -> float:
-	return float(fort(c) * War.GARRISON_PER_FORT)
+	var base := float(fort(c) * War.GARRISON_PER_FORT)
+	if w.council != null and w.realms.has(c.holder) and w.realms[c.holder].has("ruler_id"):
+		base *= 1.0 + Councils.ORGANIZE_GARRISON * w.council.task_skill(w.ruler(c.holder), "organize")
+	return base
 
 
 ## 围下来要多少进度 (守军不满的城快一些, 照三代)
@@ -301,7 +304,8 @@ func raise(p: Person, day: int) -> Dictionary:
 
 
 func upkeep(a: Dictionary) -> float:
-	return a.levy / 1000.0 * War.UPKEEP_PER_1000
+	var k := 1.0 - Councils.ORGANIZE_UPKEEP * w.council.task_skill(w.people.get(a.owner), "organize")
+	return a.levy / 1000.0 * War.UPKEEP_PER_1000 * maxf(0.5, k)
 
 
 func can_disband(a: Dictionary) -> String:
@@ -605,6 +609,14 @@ func _roll(b: Dictionary, day: int) -> void:
 	b.adv_b = _advantage(_side(b.b), day, false)
 
 
+## 元帅「训练将领」: 一边的兵打仗强多少 (这边几个主人里最好的那个元帅)
+func _trained(side: Array) -> float:
+	var best := 0
+	for a in side:
+		best = maxi(best, w.council.task_skill(w.people.get(a.owner), "train"))
+	return 1.0 + Councils.TRAIN_DAMAGE * best
+
+
 ## 一方垮了: 剩下不到开打时的两成
 func _broken(men: float, start: float) -> bool:
 	return men < 1.0 or men <= start * War.BREAK_AT
@@ -625,8 +637,8 @@ func _battle_day(b: Dictionary, day: int, events: Array) -> void:
 	var sb := _side_men(b.b)
 	var width := 0.5 * (sa + sb)
 	var adv: int = int(b.adv_a) - int(b.adv_b)
-	var dmg_a := minf(sa, width) * War.DAMAGE * War.DAMAGE_SCALE * (1.0 + War.ADV_BONUS * maxi(0, adv))
-	var dmg_b := minf(sb, width) * War.DAMAGE * War.DAMAGE_SCALE * (1.0 + War.ADV_BONUS * maxi(0, -adv))
+	var dmg_a := minf(sa, width) * War.DAMAGE * War.DAMAGE_SCALE * (1.0 + War.ADV_BONUS * maxi(0, adv)) * _trained(A)
+	var dmg_b := minf(sb, width) * War.DAMAGE * War.DAMAGE_SCALE * (1.0 + War.ADV_BONUS * maxi(0, -adv)) * _trained(B)
 	var lose_b := minf(sb, dmg_a / War.TOUGHNESS)
 	var lose_a := minf(sa, dmg_b / War.TOUGHNESS)
 	_take(A, lose_a)
@@ -1229,7 +1241,7 @@ func monthly(day: int, events: Array) -> void:
 			_lose(a, soldiers(a) * War.ATTRITION_SIEGE)
 	for p in w.living.values():
 		if p.levy_ratio < 1.0 and army_of(p.id).is_empty():
-			p.levy_ratio = minf(1.0, p.levy_ratio + War.LEVY_REFILL)
+			p.levy_ratio = minf(1.0, p.levy_ratio + War.LEVY_REFILL * (1.0 + Councils.ORGANIZE_REFILL * w.council.task_skill(p, "organize")))
 	for c in w.counties:
 		if not sieges.has(c.id):
 			c.garrison = minf(max_garrison(c), c.garrison + max_garrison(c) * War.GARRISON_REFILL)

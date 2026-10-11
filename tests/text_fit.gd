@@ -45,9 +45,13 @@ func _run() -> void:
 		k.stress = 150.0
 		hud.show_person(k.id)
 		await _frame()
-		for kind in ["realm", "army", "schemes", "decisions"]:
+		for kind in ["realm", "army", "schemes", "decisions", "council"]:
 			hud._open_window(kind)
 			await _frame()
+		for seat in Councils.SEATS:
+			for kind in ["council_pick", "council_task", "council_target"]:
+				hud._open_window(kind, 0, {"seat": seat})
+				await _frame()
 		hud.close_window()
 		for q in w.vassals_of(k).slice(0, 2) + w.children_of(k).slice(0, 2):
 			hud.show_person(q.id)

@@ -346,6 +346,51 @@ func _run() -> void:
 	hud._open_decisions()
 	await _shot("54_决议_排解压力")
 	hud.close_window()
+
+	# 第 9 块「议会」
+	main.play_as("mercia")
+	hud._open_council_window()
+	await _shot("55_议会")
+	hud._council_click(4, false)
+	await _shot("56_议会_挑宗教大臣")
+	hud._open_window("council_task", 0, {"seat": "spymaster"})
+	await _shot("57_议会_密探头子的活")
+	hud._open_window("council_target", 0, {"seat": "chaplain"})
+	await _shot("58_议会_编造宣称的目标")
+	hud.close_window()
+
+	# 对犯人的处置 (照三代)
+	var me9: Person = hud.me()
+	var cap: Person = w.vassals_of(me9)[0]
+	cap.prisoner_of = me9.id
+	cap.dungeon = true
+	hud.show_person(cap.id)
+	hud._open_actions()
+	await _shot("59_对犯人的处置")
+	hud.close_window()
+	w.blind(me9, cap, main.clock.day)
+	w.torture(me9, cap, main.clock.day, [])
+	hud.show_person(cap.id)
+	await _shot("60_刺瞎和用刑以后")
+	hud.show_person(me9.id)
+	await _shot("61_人物窗口_恐惧")
+	hud.close_person()
+
+	# 性别法、随母婚
+	me9.prestige = 600.0
+	hud._open_realm_window()
+	await _shot("62_国家窗口_性别法")
+	hud.close_window()
+	var dau := w.make_noble(me9.culture, true, 17, main.clock.day)
+	dau.house = me9.house
+	dau.father = me9.id
+	w._register(dau)
+	hud.show_person(dau.id)
+	hud._open_match()
+	hud._toggle_matri()
+	await _shot("63_说亲_随母婚")
+	hud.close_window()
+	hud.close_person()
 	for file in DirAccess.get_files_at(SaveGame.dir):
 		DirAccess.remove_absolute(SaveGame.dir.path_join(file))
 	quit()
@@ -391,7 +436,7 @@ class TraitSheet:
 			items.append([t.id, t.name])
 		for t in Traits.data().childhood:
 			items.append([t.id, t.name])
-		for t in Traits.data().coping + Traits.data().stress:
+		for t in Traits.data().coping + Traits.data().stress + Traits.data().physical:
 			items.append([t.id, t.name])
 		for tr in Traits.data().education.tracks:
 			for lv in [1, 4]:

@@ -40,6 +40,7 @@ const CHAR_TRAITS_Y := 500.0
 const CHAR_SKILLS_Y := 680.0
 const CHAR_NAME := Rect2(276, 30, 240, 156)          # 名字这一块 (鼠标指着看名字、头衔、家族)
 const CHAR_OPINION := Rect2(24, 766, 512, 40)
+const CHAR_DREAD := Rect2(390, 326, 146, 34)          # 人物窗口: 恐惧 (健康那一行的右边)
 const CHAR_HEIR := Rect2(24, 808, 512, 36)
 const FAMILY_Y := 884.0                              # 家人小头像那一排
 const FAMILY_FACE := Vector2(56, 65)
@@ -55,6 +56,7 @@ const WINDOW := Rect2(580, 60, 820, 960)              # 右边到 1400 为止, �
 const WIN_ROW_Y := 244.0
 const WIN_ROW_H := 78.0
 const WIN_ROWS := 9
+const MATCH_MATRI := Rect2(1070, 74, 250, 36)        # 说亲窗口: 随母婚 (自家是女的时)
 const MATCH_TABS := ["最肯答应的在前", "身份最高的在前", "本事最好的在前"]   # 说亲名单的排法 (人不变, 只换先后)
 const NAME_BUTTON := Vector2(230, 46)                 # 起名窗口里一个名字的按钮
 const MENU_BOX := Rect2(610, 120, 700, 820)           # 菜单 (存档、读档)
@@ -71,6 +73,7 @@ const ALERT_GAP := 62.0
 const WAR_ICON_X := 1180.0       # 在打的仗: 右上角资源条左边一排 (第 6 块)
 const WAR_ICON_GAP := 48.0
 const WAR_ICON_R := 19.0
+const COUNCIL_SPLIT := 390.0      # 议会窗口一行: 左边是人 (点了换人), 右边是活 (点了换活)
 const ASK_BUTTONS := [Rect2(640, 630, 300, 54), Rect2(980, 630, 300, 54)]   # 问你要不要的窗口: 两个按钮
 const STORY := Rect2(510, 190, 900, 700)          # 随机事件的窗口 (第 8 块, 照三代: 正中间, 左边头像, 右边说的事, 下面几个办法)
 const STORY_BOOK := Rect2(1336, 208, 52, 52)      # 事件窗口右上角的书: 鼠标指着看历史背景 (只有照史料来的事件有)
@@ -426,6 +429,15 @@ func alerts_now() -> Array:
 		if not cope.is_empty():
 			out.append({"kind": "cope", "icon": "candle", "color": Look.RED, "count": 1,
 					"tip": "压力 %d: 可以「%s」排解一下\n(点一下: 打开决议)" % [int(m.stress), cope[0].name], "click": _open_decisions})
+	# 议会有空位子 (第 9 块)
+	if world.council.key_of(m) != "":
+		var empty := []
+		for seat in Councils.SEATS:
+			if world.council.member(m, seat) == null:
+				empty.append(world.council.seat_name(m, seat))
+		if not empty.is_empty():
+			out.append({"kind": "council", "icon": "council", "color": Look.GOLD, "count": empty.size(),
+					"tip": "议会有空位子: %s (这些活没人干)\n(点一下: 打开议会)" % "、".join(empty), "click": _open_council_window})
 	# 有人关在你的大牢里
 	var held := world.living.values().filter(func(p: Person) -> bool: return p.alive and p.prisoner_of == m.id)
 	if not held.is_empty():
@@ -472,7 +484,7 @@ func _alert_click(kind: String) -> void:
 
 ## 某个人现在的头像 (同一个人同一个岁数只画一次)
 func face(p: Person) -> Texture2D:
-	var key := "%s %d" % [p.id, p.age(clock.day)]
+	var key := "%s %d %s%s" % [p.id, p.age(clock.day), "b" if p.has_trait("blind") else "", "e" if p.has_trait("beardless_eunuch") else ""]
 	if not _faces.has(key):
 		_faces[key] = ImageTexture.create_from_image(Portrait.make(p.looks(clock.day)))
 	return _faces[key]
@@ -648,6 +660,8 @@ func _make_spots() -> void:
 			_spot(Rect2(1878, RIGHT_MENU_Y[i] - 20, 42, 40), "领地: 你的直辖领地、封臣, 把领地封出去", _open_realm_window)
 		elif i == 1:
 			_spot(Rect2(1878, RIGHT_MENU_Y[i] - 20, 42, 40), "军队: 征兵、解散、谁带兵, 在打的仗", _open_army_window)
+		elif i == 3:
+			_spot(Rect2(1878, RIGHT_MENU_Y[i] - 20, 42, 40), "议会: 你的大臣 (首相、元帅、管家、密探头子、宗教大臣) 和他们在干的活", _open_council_window)
 		elif i == 4:
 			_spot(Rect2(1878, RIGHT_MENU_Y[i] - 20, 42, 40), "阴谋: 你在搞的阴谋、有人在害你、你知道的秘密、你攥着的把柄", _open_schemes_window)
 		else:
@@ -744,6 +758,8 @@ func _make_person_spots() -> void:
 				"\n两个国王的近亲 (本人、父母、子女、兄弟姐妹、祖孙) 结了婚, 两国就是同盟。\n打仗时盟友会来帮忙 (保卫战容易答应)" + tyr, Callable(), _person_spots)
 	elif p.alive and _status_line(p) != "":
 		_spot(CHAR_ALLIES, _status_tip(p), (show_person.bind(world.liege_of(p).id) if world.liege_of(p) != null else Callable()), _person_spots)
+	if p.alive and (p.dread >= 1.0 or world.is_landed(p)) and p.pregnant.is_empty():
+		_spot(CHAR_DREAD, _dread_tip(p), Callable(), _person_spots)
 	var cope_n := p.coping().size()
 	_spot(CHAR_STRESS, "压力 %d (第 %d 档, 最多 %d)\n做违背自己性格的事、家里人去世会涨; 每年自己降 %d%s%s。\n100 点一档, 第 2 档起健康变差 (第 2 档 -1、第 3 档 -2);\n涨过 100 / 200 / 300 会崩溃: 染上排解压力的毛病, 第 3 档还可能疯掉、让位、寻死。\n左下角「决议」里有排解压力的法子 (有排解压力的毛病才有)。" % [
 			int(p.stress), p.stress_level(), int(Person.MAX_STRESS), int(Person.STRESS_DECAY * (2 if p.has_trait("calm") else 1)), " (冷静的人降两倍)" if p.has_trait("calm") else "",
@@ -905,12 +921,25 @@ func _focus_person_realm() -> void:
 
 ## 一个人身上的特点牌子: 先性格, 再天生的, 最后教育
 func _person_badges(p: Person) -> Array:
-	var list: Array = p.personality() + p._of_kind("stress") + p.coping() + p.congenital()
+	var list: Array = p.personality() + p._of_kind("stress") + p.coping() + p.physical() + p.congenital()
 	if p.childhood() != "":
 		list.push_front(p.childhood())
 	if not p.education.is_empty():
 		list.append(p.education)
 	return list
+
+
+## 恐惧的说明 (照三代)
+func _dread_tip(p: Person) -> String:
+	var lines := ["恐惧 %d (本来的恐惧 %d, 每月往那里走 %.1f)" % [int(p.dread), int(p.natural_dread()), World.DREAD_DRIFT],
+		"用刑、刺瞎、阉割、处死会涨; 残忍 +35、易怒 +20、仁慈 -15 是本来的恐惧",
+		"恐惧比一个人的胆量高 20 他就怕你, 高 45 就吓坏了:",
+		"怕你的人不太敢暗害你 (吓坏了的根本不敢), 你关他也更容易抓到 (+25% / +50%)",
+		"勇敢的人永远不怕, 怯懦的人永远吓坏了"]
+	var m := me()
+	if m != null and m != p:
+		lines.append(["——\n他不怕你", "——\n他怕你", "——\n他被你吓坏了"][p.fear_of(m)])
+	return "\n".join(lines)
 
 
 func _badge_rect(i: int) -> Rect2:
@@ -955,6 +984,11 @@ func _trait_tip(what: Variant) -> String:
 		lines.append("排解压力的毛病 (压力太大崩溃时染上的): 压力降得快 %d%%;\n左下角「决议」里能「%s」, 三年一次" % [int(Person.COPING_DECAY * 100), info.decision.name])
 	elif info.get("kind", "") == "stress":
 		lines.append("压力太大崩溃时染上的")
+	elif info.get("kind", "") == "physical":
+		var rec := float(info.get("recover", 0.0))
+		lines.append(("身上的伤: 每年 %d%% 的机会好一档" % int(rec * 100)) if rec > 0.0 else "好不了")
+		if info.has("fertility") and float(info.fertility) > 0.0:
+			lines.append("生育 ×%.2f" % float(info.fertility))
 	elif info.get("kind", "") == "childhood":
 		lines.append("小时候的性格 (3 岁到 16 岁): 学%s合适" % "、".join(info.focus.map(func(s: String) -> String: return Traits.skill_info(s).name)))
 		lines.append("长大以后多半有「%s」里的一个" % "」「".join(info.grows_into.map(func(t: String) -> String: return Traits.get_trait(t).name)))
@@ -990,11 +1024,17 @@ func _open_window(kind: String, tab := 0, extra := {}) -> void:
 	var p: Person = world.people[pid]
 	window = {"kind": kind, "person": pid, "tab": tab, "page": 0, "armed": -1}
 	window.merge(extra)
+	if kind == "match" and p.female and (p.realm != "" or world.is_landed(p) or (player != "" and world.heir(player, clock.day) == p)):
+		window.matri = true  # 女统治者、女继承人默认随母婚
 	if kind == "teacher" and p.focus == "":
 		p.focus = Traits.pick_focus(world.rng, p.childhood())
 	match kind:
 		"match":
 			window.rows = _match_rows(p, tab)
+			if window.get("matri", false):
+				for r in window.rows:
+					r.acc = Marriage.acceptance(world, me(), p, r.person, clock.day, true)
+				_sort_match_rows(window.rows, tab)
 		"teacher":
 			window.rows = _teacher_rows(p)
 		"actions":
@@ -1019,6 +1059,14 @@ func _open_window(kind: String, tab := 0, extra := {}) -> void:
 			window.rows = _agent_rows(p, int(extra.get("scheme", -1)))
 		"decisions":
 			window.rows = Decisions.list_for(world, p)
+		"council":
+			window.rows = _council_rows(p)
+		"council_pick":
+			window.rows = _council_pick_rows(p, String(extra.get("seat", "")))
+		"council_task":
+			window.rows = _council_task_rows(p, String(extra.get("seat", "")))
+		"council_target":
+			window.rows = _council_target_rows(p, String(extra.get("seat", "")))
 	_make_window_spots()
 	redraw()
 
@@ -1123,12 +1171,22 @@ func _make_window_spots() -> void:
 	if window.kind == "match":
 		for i in MATCH_TABS.size():
 			_spot(_win_tab_rect(i, MATCH_TABS.size()), "换个排法: %s (名单里的人不变)" % MATCH_TABS[i], _set_window_tab.bind(i), _window_spots)
+		if p.female:
+			_spot(MATCH_MATRI, "随母婚 (照三代): 孩子算你家的。\n女统治者、女继承人要这样嫁, 不然孩子算丈夫家, 继承不到她的东西。\n男方不太肯 (肯不肯 %d)\n(点一下: 开 / 关)" % Marriage.MATRI_ACCEPT, _toggle_matri, _window_spots)
 	elif window.kind == "teacher":
 		var tracks: Array = Traits.data().education.tracks
 		for i in tracks.size():
 			var info := Traits.skill_info(tracks[i].skill)
 			var fits := Traits.focus_fits(p.childhood(), tracks[i].skill)
 			_spot(_win_tab_rect(i, tracks.size()), "学%s: %s%s" % [tracks[i].name, tracks[i].desc, "\n(合他小时候的性格, 学得好一些)" if fits else ""], _set_focus.bind(tracks[i].skill), _window_spots)
+	if window.kind == "council":
+		for i in window.rows.size():
+			var cr: Dictionary = window.rows[i]
+			_spot(council_half(i, false), _council_person_tip(p, cr), _council_click.bind(i, false), _window_spots)
+			_spot(council_half(i, true), _council_task_tip(p, cr), _council_click.bind(i, true), _window_spots)
+			if cr.has("person"):
+				_window_face(_win_row_rect(i).position + Vector2(8, 4), cr.person)
+		return
 	var start: int = window.page * _win_rows()
 	for i in range(start, mini(start + _win_rows(), window.rows.size())):
 		var r: Dictionary = window.rows[i]
@@ -1136,20 +1194,24 @@ func _make_window_spots() -> void:
 		_spot(rect, _row_tip(p, r), _choose_row.bind(i), _window_spots)
 		if not r.has("person") or window.kind == "actions":
 			continue
-		var c: Person = r.person
-		var tex := TextureRect.new()
-		tex.texture = face(c)
-		tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		tex.stretch_mode = TextureRect.STRETCH_SCALE
-		tex.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		tex.position = rect.position + Vector2(8, 4)
-		tex.size = Vector2(56, 65)
-		_root.add_child(tex)
-		_window_faces.append(tex)
+		_window_face(rect.position + Vector2(8, 4), r.person)
 	if _win_pages() > 1:
 		_spot(Rect2(WINDOW.position.x + 20, WINDOW.end.y - 62, 200, 46), "上一页", _turn_page.bind(-1), _window_spots)
 		_spot(Rect2(WINDOW.end.x - 220, WINDOW.end.y - 62, 200, 46), "下一页", _turn_page.bind(1), _window_spots)
+
+
+## 窗口一行左边的小头像
+func _window_face(pos: Vector2, c: Person) -> void:
+	var tex := TextureRect.new()
+	tex.texture = face(c)
+	tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tex.stretch_mode = TextureRect.STRETCH_SCALE
+	tex.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tex.position = pos
+	tex.size = Vector2(56, 65)
+	_root.add_child(tex)
+	_window_faces.append(tex)
 
 
 func _row_tip(p: Person, r: Dictionary) -> String:
@@ -1158,7 +1220,9 @@ func _row_tip(p: Person, r: Dictionary) -> String:
 			return _match_tip(p, r)
 		"teacher":
 			return _teacher_tip(p, r)
-		"actions", "army", "war", "declare", "schemes", "scheme", "decisions":
+		"council_pick":
+			return _council_pick_tip(p, r)
+		"actions", "army", "war", "declare", "schemes", "scheme", "decisions", "council_task", "council_target":
 			return "%s\n%s%s" % [r.name, r.get("tip", r.desc), ("\n(做不了: %s)" % r.why) if not r.ok else ("\n(要点两次: 第一次点了再点一次才算数)" if r.harsh else "")]
 		"agents":
 			var q: Person = r.person
@@ -1204,6 +1268,30 @@ func _actions_for(p: Person) -> Array:
 		var just := Feudal.has_crime(p, day)
 		acts.append({"name": "处死", "icon": "swords", "desc": "处死%s; 他的家人好感 -50 (三十年); %s" % [p.name, "他有罪, 不算暴政" if just else "暴政 +%d" % int(Feudal.TYRANNY_EXECUTE)],
 				"ok": true, "why": "", "harsh": true, "do": func(ev: Array) -> Dictionary: return world.execute(m, p, day, ev)})
+		# 对犯人的处置 (照三代): 用刑、刺瞎、阉割、逼他出家、流放
+		var dr := int(world.cruelty_dread(m, p))
+		var st := World.cruelty_stress(m)
+		var hurt := "他好感 %d (%d 年)、他家里人 %d; 恐惧 +%d%s" % [World.CRUEL_OPINION, 50, World.CRUEL_FAMILY, dr, ("; 你的压力 %+d" % int(st)) if st != 0.0 else ""]
+		var why_t := world.punish_problem(m, p, "torture")
+		acts.append({"name": "用刑", "icon": "torch", "desc": "他会受伤, 伤得最重再用刑会死; 一半机会招出秘密; 恐惧 +%d; %s" % [dr, "他有罪" if just else "没罪: 暴政 +%d" % int(Feudal.TYRANNY_EXECUTE)],
+				"tip": "他会受伤 (受伤 → 重伤 → 遍体鳞伤, 最重了再用刑会死); 一半机会招出一个秘密; %s; %s" % [hurt, "他有罪, 不算暴政" if just else "没罪: 暴政 +%d" % int(Feudal.TYRANNY_EXECUTE)],
+				"ok": why_t == "", "why": why_t, "harsh": true, "do": func(ev: Array) -> Dictionary: return world.torture(m, p, day, ev)})
+		var why_b := world.punish_problem(m, p, "blind")
+		acts.append({"name": "刺瞎", "icon": "p_blind", "desc": "他变成瞎子 (军事 -6、管理 -2、密谋 -2、武力 -10); 恐惧 +%d" % dr,
+				"tip": "他变成瞎子 (军事 -6、管理 -2、密谋 -2、武力 -10, 长相 -10); %s" % hurt,
+				"ok": why_b == "", "why": why_b, "harsh": true, "do": func(_ev: Array) -> Dictionary: return world.blind(m, p, day)})
+		var why_c := world.punish_problem(m, p, "castrate")
+		acts.append({"name": "阉割", "icon": "p_eunuch", "desc": "他不能再结婚、生孩子, 也不能继承 (宣称没了); 恐惧 +%d" % dr,
+				"tip": "他不能再结婚、生孩子, 也不能继承 (宣称没了)%s; %s" % ["; 不满 12 岁: 不长胡子、武力 -4" if p.age(day) < 12 else "", hurt],
+				"ok": why_c == "", "why": why_c, "harsh": true, "do": func(_ev: Array) -> Dictionary: return world.castrate(m, p, day)})
+		var why_v := world.punish_problem(m, p, "vows")
+		acts.append({"name": "逼他出家", "icon": "cross", "desc": "他肯 (机会 %d%%) 就进修道院当修士: 不结婚、不继承; 不肯就接着关" % int(world.vows_chance(p) * 100),
+				"tip": "他肯的话 (机会 %d%%) 放出来进修道院当修士: 不结婚、不继承、宣称没了%s; 不肯就接着关, 过一年能再逼" % [int(world.vows_chance(p) * 100), "; 他的领地照继承法传下去" if world.is_landed(p) else ""],
+				"ok": why_v == "", "why": why_v, "harsh": true, "do": func(ev: Array) -> Dictionary: return world.force_vows(m, p, day, ev)})
+		var why_n := world.punish_problem(m, p, "banish")
+		acts.append({"name": "流放", "icon": "banner", "desc": "他肯 (机会 %d%%) 就赶到别的国家, 钱没收; %s" % [int(world.banish_chance(p, day) * 100), "他有罪" if just else "没理由: 暴政 +%d" % int(World.BANISH_TYRANNY)],
+				"tip": "他肯的话 (机会 %d%%) 放出来赶到别的国家: %s钱没收, 你攥着他一个把柄, 他好感 -20 (十年); %s" % [int(world.banish_chance(p, day) * 100), "领地照继承法传下去, " if world.is_landed(p) else "", "他有罪, 不算暴政" if just else "没理由: 暴政 +%d" % int(World.BANISH_TYRANNY)],
+				"ok": why_n == "", "why": why_n, "harsh": true, "do": func(ev: Array) -> Dictionary: return world.banish(m, p, day, ev)})
 	else:
 		acts.append({"name": "送礼", "icon": "coins", "desc": "花 %d 金币, 他对你好感 +20 (五年)" % int(Feudal.GIFT),
 				"ok": m.gold >= Feudal.GIFT, "why": "钱不够 (有 %d, 要 %d)" % [int(m.gold), int(Feudal.GIFT)], "harsh": false,
@@ -1351,6 +1439,9 @@ func _do_action(i: int) -> void:
 		"decisions":
 			_open_window("decisions")
 			_dec_day = -1
+			refresh_person()
+		"council_task", "council_target":
+			_open_window("council")
 			refresh_person()
 
 
@@ -1587,6 +1678,200 @@ func _war_icon_rect(i: int) -> Rect2:
 	return Rect2(c - Vector2(WAR_ICON_R, WAR_ICON_R), Vector2(WAR_ICON_R, WAR_ICON_R) * 2)
 
 
+# ---- 议会 (第 9 块; 右边一列第四个按钮) ----
+
+func _open_council_window() -> void:
+	if player_id == "":
+		toast("先选一个人来玩")
+		return
+	if world.council.key_of(me()) == "":
+		toast("没有领地, 就没有议会")
+		return
+	_open_window("council")
+
+
+## 议会窗口: 五个大臣一行一个, 最后是心腹 (配偶)
+func _council_rows(m: Person) -> Array:
+	var rows := []
+	var c := world.council.council_of(m)
+	for seat in Councils.SEATS:
+		var st: Dictionary = c.get(seat, {"who": "", "task": Councils.DEFAULT_TASK[seat], "progress": 0.0, "target": ""})
+		var row := {"seat": seat, "task": st.task, "progress": float(st.progress), "target": st.target}
+		if st.who != "" and world.people.has(st.who):
+			row.person = world.people[st.who]
+		rows.append(row)
+	var conf := {"seat": "confidant"}
+	if m.living_spouse() != null:
+		conf.person = m.living_spouse()
+	rows.append(conf)
+	return rows
+
+
+func council_half(i: int, right: bool) -> Rect2:
+	var r := _win_row_rect(i)
+	return Rect2(r.position.x + (COUNCIL_SPLIT if right else 0.0), r.position.y, (r.size.x - COUNCIL_SPLIT) if right else COUNCIL_SPLIT, r.size.y)
+
+
+func _council_click(i: int, right: bool) -> void:
+	var row: Dictionary = window.rows[i]
+	if row.seat == "confidant":
+		toast("心腹是配偶自动当的")
+		return
+	_open_window("council_task" if right else "council_pick", 0, {"seat": row.seat})
+
+
+## 一个人跟你是什么关系 (议会里写): 弟弟、你的封臣、住在你的宫廷……
+func _court_how(m: Person, q: Person) -> String:
+	var rel := world.relation(m, q)
+	if world.liege_of(q) == m:
+		return ((rel + " · ") if rel != "" else "") + "你的封臣 (%s)" % world.title_of(q)
+	if rel != "":
+		return rel
+	if q.house == m.house and q.house != "":
+		return "族人"
+	if q.court != "":
+		return ("修士" if q.clergy else "本地贵族") + ", 住在你的宫廷"
+	return world.house_name(q.house)
+
+
+func _council_person_tip(m: Person, row: Dictionary) -> String:
+	if row.seat == "confidant":
+		var sp: Person = row.get("person")
+		if sp == null:
+			return "心腹: 配偶自动当; 你还没有配偶"
+		return "心腹: %s %s\n配偶的本事五分之一加给你 (武力除外)%s" % ["妻子" if sp.female else "丈夫", sp.name, "" if m.realm != "" else "\n(只有国王的配偶帮得上)"]
+	var name := world.council.seat_name(m, row.seat)
+	var sk: String = Councils.SEAT_INFO[row.seat].skill
+	if not row.has("person"):
+		return "%s: 空着 (这件活没人干)\n要%s好的人\n(点一下: 挑一个人)" % [name, Traits.skill_info(sk).name]
+	var q: Person = row.person
+	return "%s %s (%d 岁) · %s\n%s %d: 越高活干得越好\n(点一下: 换人或者撤掉)" % [name, q.name, q.age(clock.day), _court_how(m, q), Traits.skill_info(sk).name, q.skill(sk, clock.day)]
+
+
+func _council_task_tip(m: Person, row: Dictionary) -> String:
+	if row.seat == "confidant":
+		return _council_person_tip(m, row)
+	var info: Dictionary = Councils.TASK_INFO[row.task]
+	var lines := ["%s: %s" % [info.name, info.desc]]
+	var q: Person = row.get("person")
+	if q == null:
+		lines.append("位子空着, 这件活现在没人干")
+	else:
+		lines.append("现在: " + council_effect(row.task, q.skill(Councils.SEAT_INFO[row.seat].skill, clock.day)))
+	if row.target != "":
+		lines.append("目标: %s · 进度 %d%%" % [world.council.target_name(row.task, row.target), int(row.progress)])
+	lines.append("(点一下: 换一件活)")
+	return "\n".join(lines)
+
+
+## 这件活在这个本事下现在的效果
+func council_effect(task: String, sk: int) -> String:
+	match task:
+		"domestic":
+			return "直属封臣对你好感 +%d, 暴政降得快 %d%%" % [int(Councils.DOMESTIC_OPINION * sk), int(Councils.DOMESTIC_TYRANNY * sk * 100)]
+		"foreign":
+			return "每月威望 +%.1f, 别国国王对你好感 +%d" % [Councils.FOREIGN_PRESTIGE * sk, int(Councils.FOREIGN_OPINION * sk)]
+		"integrate", "fabricate":
+			return "每月进度 +%.1f%%" % world.council.monthly_progress(task, sk)
+		"organize":
+			return "养兵的钱 -%d%%, 兵补得快 +%d%%, 守军 +%d%%" % [int(Councils.ORGANIZE_UPKEEP * sk * 100), int(Councils.ORGANIZE_REFILL * sk * 100), int(Councils.ORGANIZE_GARRISON * sk * 100)]
+		"train":
+			return "你的兵打仗 +%d%%, 每月 %.1f%% 的机会让一个带兵的人军事 +1" % [int(Councils.TRAIN_DAMAGE * sk * 100), Councils.TRAIN_CHANCE * sk * 100]
+		"taxes":
+			return "直辖领地的钱 +%.1f%%" % (Councils.TAX_PER * sk * 100)
+		"disrupt":
+			return "别人害你的阴谋慢 %.1f 天, 保密 -%d" % [Councils.DISRUPT_DAYS + Councils.DISRUPT_PER * sk, int(Councils.DISRUPT_SECRECY * sk)]
+		"support":
+			return "你的阴谋快 %d 天, 成功率 +%.1f%%" % [int(Councils.SUPPORT_DAYS * sk), Councils.SUPPORT_SUCCESS + Councils.SUPPORT_PER * sk]
+		"secrets":
+			return "每年 %d%% 的机会查出一个秘密" % int(Councils.SECRETS_PER_YEAR * sk * 100)
+	return ""
+
+
+## 挑谁当这个位子: 最上面是「撤掉」(位子有人时), 再是你宫廷里能当的人 (本事好的在前), 最后几个能请来的本地人
+func _council_pick_rows(m: Person, seat: String) -> Array:
+	var rows := []
+	var cur := world.council.member(m, seat)
+	if cur != null:
+		rows.append({"remove": true, "person": cur})
+	var powerful := world.council.powerful_vassals(m)
+	var sk: String = Councils.SEAT_INFO[seat].skill
+	var list := []
+	for q in world.council.candidates(m, seat):
+		list.append({"person": q, "skill": q.skill(sk, clock.day), "powerful": powerful.has(q), "how": _court_how(m, q), "new": false})
+	list.sort_custom(func(x: Dictionary, y: Dictionary) -> bool: return x.skill > y.skill)
+	rows.append_array(list)
+	# 请来的本地人: 同一年里列的是同一批 (不动游戏的随机数)
+	var r := RandomNumberGenerator.new()
+	r.seed = hash("%s %s %d" % [world.council.key_of(m), seat, GameDate.from_day(clock.day)[0]])
+	for i in Councils.LOCALS:
+		var q := world.council.make_local(m, seat, r)
+		var how := ("修士" if q.clergy else "祭司") if seat == "chaplain" else "本地贵族"
+		rows.append({"person": q, "skill": q.skill(sk, clock.day), "powerful": false, "how": how + ", 请来住在你的宫廷", "new": true})
+	return rows
+
+
+func _council_pick_tip(m: Person, r: Dictionary) -> String:
+	var seat: String = window.seat
+	var name := world.council.seat_name(m, seat)
+	var q: Person = r.person
+	if r.get("remove", false):
+		return "撤掉%s, 这个位子空着\n他对你好感 %d (记 %d 年)" % [q.name, Councils.FIRED_OPINION, Councils.FIRED_YEARS]
+	var sk: String = Councils.SEAT_INFO[seat].skill
+	var lines := ["%s (%d 岁) · %s" % [q.name, q.age(clock.day), r.how], "%s %d" % [Traits.skill_info(sk).name, int(r.skill)]]
+	if r.powerful:
+		lines.append("他是有实力的封臣: 不让他进议会, 他对你好感 %d" % Councils.POWERFUL_OPINION)
+	var cur := world.council.member(m, seat)
+	if cur != null:
+		lines.append("换掉现在的%s: 他对你好感 %d (记 %d 年)" % [cur.name, Councils.FIRED_OPINION, Councils.FIRED_YEARS])
+	lines.append("(点一下: 让他当%s)" % name)
+	return "\n".join(lines)
+
+
+## 换一件活
+func _council_task_rows(m: Person, seat: String) -> Array:
+	var rows := []
+	var st: Dictionary = world.council.council_of(m).get(seat, {})
+	var q := world.council.member(m, seat)
+	var sk := q.skill(Councils.SEAT_INFO[seat].skill, clock.day) if q != null else 0
+	for t in Councils.TASKS[seat]:
+		var info: Dictionary = Councils.TASK_INFO[t]
+		var why := world.council.task_problem(m, t)
+		var on: bool = st.get("task", "") == t
+		var tt: String = t
+		rows.append({"id": t, "name": info.name + ("  (现在在干)" if on else ""), "icon": info.icon, "desc": info.desc,
+				"tip": info.desc + ("\n现在: " + council_effect(t, sk) if q != null else "\n位子空着, 没人干"), "ok": why == "", "why": why, "harsh": false,
+				"do": func(_ev: Array) -> Dictionary: return world.council.set_task(m, seat, tt)})
+		if on and info.has("target") and why == "":
+			rows.append({"id": "target", "name": "换%s的目标 (现在: %s)" % [info.name, world.council.target_name(t, st.get("target", ""))], "icon": "plus",
+					"desc": "挑别的%s" % ("地" if info.target == "county" else "公国"), "ok": true, "why": "", "harsh": false, "nav": true,
+					"do": func(_ev: Array) -> Dictionary:
+						_open_window("council_target", 0, {"seat": seat})
+						return {"ok": true, "text": ""}})
+	return rows
+
+
+## 编造宣称 (整合头衔) 挑目标
+func _council_target_rows(m: Person, seat: String) -> Array:
+	var rows := []
+	var st: Dictionary = world.council.council_of(m).get(seat, {})
+	var task: String = st.get("task", "")
+	var mine_duchies := world.realm_duchies(world.realm_of_person(m))
+	for id in world.council.target_options(m, task):
+		var tid: String = id
+		var desc := ""
+		if task == "fabricate":
+			var c: Dictionary = world.by_id[id]
+			var k := world.ruler(c.holder)
+			desc = "%s的地 · %s能征 %d 人%s" % [world.realm_name(c.holder), k.name, int(world.warfare.strength(k)), " · 法理上本来就能要 (不用编)" if mine_duchies.has(c.duchy) else ""]
+		else:
+			desc = "改归%s" % world.title_name("kingdom", world.realms[m.realm].kingdoms[0])
+		rows.append({"id": id, "name": world.council.target_name(task, id) + ("  (现在的目标)" if st.get("target", "") == id else ""),
+				"icon": "quill" if task == "fabricate" else "crown", "desc": desc, "ok": true, "why": "", "harsh": false,
+				"do": func(_ev: Array) -> Dictionary: return world.council.set_task(m, seat, task, tid)})
+	return rows
+
+
 # ---- 决议 (第 8 块; 左下角最右边的圆按钮) ----
 
 func _open_decisions() -> void:
@@ -1769,6 +2054,8 @@ func _realm_rows(m: Person) -> Array:
 	var l := world.liege_of(m)
 	if l != null:
 		rows.append({"type": "liege", "person": l})
+	if m.realm != "":
+		rows.append({"type": "gender"})
 	var inc := world.income(m)
 	var dom := world.lands_of(m)
 	for i in dom.size():
@@ -1785,6 +2072,12 @@ func _realm_rows(m: Person) -> Array:
 
 func _realm_tip(r: Dictionary) -> String:
 	match r.type:
+		"gender":
+			var law := world.gender_law(player)
+			var to := "male_only" if law == "male_pref" else "male_pref"
+			var why := world.gender_law_problem(me(), to)
+			return "性别法: %s\n只有男人: 只有男人能继承 (开局都是这个, 照史实)\n男人优先: 家里没有能继承的男人时, 女人也能继承 (当女王)\n「男女平等」要信仰是男女平等的 (第 13 块)\n(点两次: 改成「%s」%s)%s" % [
+					World.GENDER_LAWS[law], World.GENDER_LAWS[to], ", 花 %d 威望" % int(World.GENDER_LAW_COST) if to == "male_pref" else ", 不花", ("\n现在改不了: " + why) if why != "" else ""]
 		"liege":
 			return "你效忠的%s (点一下看他)" % r.person.name
 		"county":
@@ -1801,6 +2094,16 @@ func _realm_tip(r: Dictionary) -> String:
 
 func _realm_click(r: Dictionary) -> void:
 	match r.type:
+		"gender":
+			var to := "male_only" if world.gender_law(player) == "male_pref" else "male_pref"
+			var i: int = window.rows.find(r)
+			if window.armed != i:
+				window.armed = i
+				toast("再点一次: 性别法改成「%s」%s" % [World.GENDER_LAWS[to], " (花 %d 威望)" % int(World.GENDER_LAW_COST) if to == "male_pref" else ""])
+				_root.queue_redraw()
+				return
+			toast(world.change_gender_law(me(), to).text)
+			_open_window("realm")
 		"liege", "vassal":
 			show_person(r.person.id)
 		"county":
@@ -1882,6 +2185,18 @@ func _set_window_tab(i: int) -> void:
 	redraw()
 
 
+func _toggle_matri() -> void:
+	if window.get("kind", "") != "match":
+		return
+	window.matri = not window.get("matri", false)
+	var p: Person = world.people[window.person]
+	for r in window.rows:
+		r.acc = Marriage.acceptance(world, me(), p, r.person, clock.day, window.matri)
+	_sort_match_rows(window.rows, window.tab)
+	_make_window_spots()
+	redraw()
+
+
 func _set_focus(skill: String) -> void:
 	var p: Person = world.people[window.person]
 	p.focus = skill
@@ -1900,8 +2215,14 @@ func _choose_row(i: int) -> void:
 	var p: Person = world.people[window.person]
 	var row: Dictionary = window.rows[i]
 	match window.kind:
-		"actions", "army", "war", "declare", "schemes", "scheme", "decisions":
+		"actions", "army", "war", "declare", "schemes", "scheme", "decisions", "council_task", "council_target":
 			_do_action(i)
+			return
+		"council_pick":
+			var seat: String = window.seat
+			toast((world.council.fire(p, seat, clock.day) if row.get("remove", false) else world.council.appoint(p, seat, row.person, clock.day)).text)
+			_open_window("council")
+			refresh_person()
 			return
 		"agents":
 			var sc: Dictionary = world.intrigue.schemes.get(int(window.get("scheme", -1)), {})
@@ -1929,7 +2250,7 @@ func _choose_row(i: int) -> void:
 		_make_person_spots_again()
 		return
 	var events := []
-	var r := world.propose(p, c, clock.day, events)
+	var r := world.propose(p, c, clock.day, events, window.get("matri", false))
 	toast(r.text)
 	if r.ok:
 		close_window()
@@ -2472,6 +2793,8 @@ class Root:
 		else:
 			Look.text(self, Vector2(284, 76), p.name, name_size, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, 224)
 		var title := w.title_of(p) if p.alive else ""
+		if title == "" and p.alive and p.clergy:
+			title = "修士"
 		if title != "":
 			Look.text(self, Vector2(286, 110), title, 18, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, 250, "sans")
 		var born: int = GameDate.from_day(p.birth_day)[0]
@@ -2503,6 +2826,9 @@ class Root:
 		var ht := p.health_text(day) if p.alive else "已故"
 		var hcol := Look.GREEN if ht in ["好", "很好"] else (Look.RED if ht in ["差", "很差"] else Look.TEXT)
 		Look.text(self, CHAR_HEALTH.position + Vector2(80, 25), ht, 20, hcol, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+		if p.alive and (p.dread >= 1.0 or w.is_landed(p)) and p.pregnant.is_empty():
+			Look.text(self, CHAR_DREAD.position + Vector2(8, 25), "恐惧", 18, Look.GOLD if hot(CHAR_DREAD) else Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+			Look.text(self, CHAR_DREAD.position + Vector2(60, 25), str(int(p.dread)), 20, Look.RED if p.dread >= 45.0 else Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
 		if p.alive and not p.pregnant.is_empty():
 			var due := GameDate.from_day(int(p.pregnant.due))
 			Icons.draw(self, "cradle", CHAR_HEALTH.position + Vector2(196, 17), 28, Look.GOLD)
@@ -2546,7 +2872,10 @@ class Root:
 			Look.text(self, Vector2(32, oy), "他对你的好感", 19, Look.GOLD)
 			var ocol := Look.GREEN if o.total > 0 else (Look.RED if o.total < 0 else Look.TEXT)
 			Look.text(self, Vector2(190, oy + 2), "%+d" % o.total, 26, ocol)
-			Look.text(self, Vector2(270, oy), "(鼠标指着看为什么)", 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+			var fear: int = p.fear_of(hud.me())
+			if fear > 0:
+				Look.text(self, Vector2(270, oy), "怕你" if fear == 1 else "被你吓坏了", 17, Look.RED, HORIZONTAL_ALIGNMENT_LEFT, 100, "sans")
+			Look.text(self, Vector2(380 if fear > 0 else 270, oy), "(鼠标指着看为什么)", 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
 		# 小孩: 学什么、老师是谁
 		if p.alive and not p.adult(day):
 			var sy := CHAR_HEIR.position.y + 25
@@ -2664,6 +2993,24 @@ class Root:
 				title = "谁来带兵"
 				sub = "带兵的人军事越高, 打仗优势越大; 武力高的打输了不容易被抓、战死。点一个人"
 				icon = "helmet"
+			"council":
+				title = "议会"
+				var pv := w.council.powerful_vassals(p)
+				var out_pv := pv.filter(func(v: Person) -> bool: return w.council.seat_of(p, v) == "")
+				sub = "左边点人换人, 右边点活换一件活。有实力的封臣 %d 个, %s" % [pv.size(), ("没进议会的: %s (对你好感 %d)" % ["、".join(out_pv.map(func(v: Person) -> String: return v.name)), Councils.POWERFUL_OPINION]) if not out_pv.is_empty() else "都在议会里"]
+				icon = "council"
+			"council_pick":
+				title = "谁来当%s" % w.council.seat_name(p, win.seat)
+				sub = "要%s好的人。你家里的男人、你的封臣、住在你宫廷的人, 还有几个能请来的本地人; 点一个人" % Traits.skill_info(Councils.SEAT_INFO[win.seat].skill).name
+				icon = Councils.SEAT_INFO[win.seat].icon
+			"council_task":
+				title = "%s干什么" % w.council.seat_name(p, win.seat)
+				sub = "一次只干一件; 换一件活, 进度从头算"
+				icon = Councils.SEAT_INFO[win.seat].icon
+			"council_target":
+				title = "挑目标"
+				sub = "挨着你国家的别人的地 (编好了能拿来宣战); 点一块"
+				icon = "quill"
 			"decisions":
 				title = "决议"
 				sub = "建立更高的头衔 (别人拿着就是篡夺)、当地特别的决议、排解压力的法子。灰的是还做不了的, 下面写着差什么; 要花钱的点两次"
@@ -2680,6 +3027,11 @@ class Root:
 		Look.text(self, r.position + Vector2(80, 56), title, 30, Look.GOLD, HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 140)
 		Look.text(self, r.position + Vector2(24, 84), sub, 16, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 48, "sans")
 		# 上面一排: 说亲是排法, 教育是学什么
+		if kind == "match" and p.female:
+			var on: bool = win.get("matri", false)
+			draw_rect(MATCH_MATRI, Color(0.2, 0.17, 0.11) if on else Color(0.11, 0.115, 0.13))
+			draw_rect(MATCH_MATRI, Look.GOLD if on or hot(MATCH_MATRI) else Look.GOLD_DIM, false, 2.0)
+			Look.text_center(self, MATCH_MATRI, ("✓ " if on else "") + "随母婚: 孩子算你家的", 16, Look.TEXT if on else Look.TEXT_DIM, "sans")
 		if kind == "match":
 			for i in MATCH_TABS.size():
 				var tr := hud._win_tab_rect(i, MATCH_TABS.size())
@@ -2728,10 +3080,11 @@ class Root:
 			var none := {"match": "没有合适的人", "teacher": "没有能当老师的大人 (家里的大人都带满了 3 个学生)", "actions": "现在没有能对他做的事",
 					"realm": "你没有领地", "grant": "没有合适的人", "declare": "没有宣战的理由", "commander": "没有能带兵的人", "war": "这场仗已经打完了",
 					"scheme": "这个阴谋已经结束了", "agents": "没有能拉的人", "schemes": "",
+					"council_pick": "没有能当的人", "council_target": "没有能挑的目标",
 					"decisions": "现在没有能做的决议 (控制了一个公国三成以上的地、或者有排解压力的毛病, 这里才会列出来)"}
 			Look.text_center(self, Rect2(r.position.x, hud._row_top() + 60, r.size.x, 40), none.get(kind, ""), 20, Look.TEXT_DIM, "sans")
 		var start: int = win.page * hud._win_rows()
-		var action_like: bool = kind in ["actions", "army", "war", "declare", "schemes", "scheme", "decisions"]
+		var action_like: bool = kind in ["actions", "army", "war", "declare", "schemes", "scheme", "decisions", "council_task", "council_target"]
 		for i in range(start, mini(start + hud._win_rows(), win.rows.size())):
 			var row: Dictionary = win.rows[i]
 			var rr := hud._win_row_rect(i - start)
@@ -2742,7 +3095,9 @@ class Root:
 			draw_rect(rr, Color(0.3, 0.1, 0.08) if armed else (Color(0.14, 0.2, 0.28) if chosen else (Color(0.13, 0.12, 0.1) if hot(rr) else Color(0.09, 0.095, 0.11))))
 			draw_rect(rr, Look.RED if armed else (Look.GOLD if hot(rr) or chosen else Color(Look.GOLD_DIM, 0.4)), false, 1.5)
 			match kind:
-				"actions", "army", "war", "declare", "schemes", "scheme", "decisions":
+				"council":
+					_council_row(rr, row, p, i)
+				"actions", "army", "war", "declare", "schemes", "scheme", "decisions", "council_task", "council_target":
 					Icons.draw(self, row.icon, rr.position + Vector2(38, 38), 40, Look.TEXT_DIM if off else Look.GOLD)
 					Look.text(self, rr.position + Vector2(76, 30), row.name + ("  (再点一次确定)" if armed else ""), 20, Look.RED if armed else (Look.TEXT_DIM if off else Look.TEXT), HORIZONTAL_ALIGNMENT_LEFT, rr.size.x - 90, "sans")
 					Look.text(self, rr.position + Vector2(76, 58), row.desc if row.ok else "做不了: " + row.why, 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, rr.size.x - 90, "sans")
@@ -2773,6 +3128,17 @@ class Root:
 						Look.text(self, rr.position + Vector2(76, 58), row.close if row.close != "" else (w.title_of(c) if w.title_of(c) != "" else c.culture_name()), 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, 340, "sans")
 						Look.text(self, rr.position + Vector2(450, 46), "+%d" % int(row.value), 24, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
 						Look.text(self, rr.position + Vector2(600, 46), row.how, 19, Look.GREEN if row.can else Look.RED, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+					elif kind == "council_pick":
+						if row.get("remove", false):
+							Look.text(self, rr.position + Vector2(76, 58), "撤掉他, 位子空着 (他对你好感 %d)" % Councils.FIRED_OPINION, 15, Look.RED, HORIZONTAL_ALIGNMENT_LEFT, 600, "sans")
+						else:
+							Look.text(self, rr.position + Vector2(76, 58), row.how, 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, 360, "sans")
+							Icons.skill_icon(self, Councils.SEAT_INFO[win.seat].skill, rr.position + Vector2(470, 37), 40)
+							Look.text(self, rr.position + Vector2(500, 46), str(row.skill), 26, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+							if row.powerful:
+								Look.text(self, rr.position + Vector2(560, 46), "有实力的封臣", 16, Look.GOLD, HORIZONTAL_ALIGNMENT_LEFT, 120, "sans")
+							elif row.new:
+								Look.text(self, rr.position + Vector2(560, 46), "请来", 16, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, 120, "sans")
 					elif kind == "commander":
 						var rel := w.relation(p, c)
 						var what := rel if rel != "" else (w.title_of(c) if w.title_of(c) != "" else w.house_name(c.house))
@@ -2796,6 +3162,44 @@ class Root:
 				var br := Rect2(r.position.x + 20, r.end.y - 62, 200, 46) if k == 0 else Rect2(r.end.x - 220, r.end.y - 62, 200, 46)
 				_wide_button(br, "上一页" if k == 0 else "下一页", false)
 			Look.text_center(self, Rect2(r.position.x, r.end.y - 62, r.size.x, 46), "第 %d / %d 页 (一共 %d 个)" % [win.page + 1, hud._win_pages(), win.rows.size()], 17, Look.TEXT_DIM, "sans")
+
+	## 议会窗口的一行: 左边 位子、人、本事; 右边 在干的活、进度
+	func _council_row(rr: Rect2, row: Dictionary, m: Person, i: int) -> void:
+		var w := hud.world
+		var day := hud.clock.day
+		var left := hud.council_half(i, false)
+		var right := hud.council_half(i, true)
+		if hot(left) or hot(right):
+			draw_rect(left if hot(left) else right, Color(Look.GOLD, 0.08))
+		draw_line(Vector2(right.position.x, rr.position.y + 8), Vector2(right.position.x, rr.end.y - 8), Color(Look.GOLD_DIM, 0.4), 1.0)
+		draw_rect(Rect2(rr.position + Vector2(8, 4), Vector2(56, 65)), Color(0.12, 0.12, 0.13), false, 1.0)
+		var q: Person = row.get("person")
+		if row.seat == "confidant":
+			Look.text(self, rr.position + Vector2(76, 26), "心腹 (配偶)", 17, Look.GOLD, HORIZONTAL_ALIGNMENT_LEFT, 300, "sans")
+			Look.text(self, rr.position + Vector2(76, 56), q.name if q != null else "还没有配偶", 20, Look.TEXT if q != null else Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, 300, "sans")
+			Look.text(self, right.position + Vector2(16, 30), "帮你: 本事的五分之一加给你", 18, Look.TEXT if q != null and m.realm != "" else Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, right.size.x - 30, "sans")
+			Look.text(self, right.position + Vector2(16, 56), "配偶自动当" + ("" if m.realm != "" else " (只有国王的配偶帮得上)"), 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, right.size.x - 30, "sans")
+			return
+		var info: Dictionary = Councils.SEAT_INFO[row.seat]
+		Icons.draw(self, info.icon, rr.position + Vector2(36, 38), 34, Look.TEXT_DIM)
+		Look.text(self, rr.position + Vector2(76, 26), w.council.seat_name(m, row.seat), 17, Look.GOLD, HORIZONTAL_ALIGNMENT_LEFT, 300, "sans")
+		if q == null:
+			Look.text(self, rr.position + Vector2(76, 56), "空着 (点一下挑人)", 19, Look.RED, HORIZONTAL_ALIGNMENT_LEFT, 300, "sans")
+		else:
+			Look.text(self, rr.position + Vector2(76, 56), q.name, 20, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, 220, "sans")
+			Icons.skill_icon(self, info.skill, rr.position + Vector2(318, 37), 34)
+			Look.text(self, rr.position + Vector2(342, 46), str(q.skill(info.skill, day)), 22, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+		var task: Dictionary = Councils.TASK_INFO[row.task]
+		Icons.draw(self, task.icon, right.position + Vector2(30, 37), 32, Look.GOLD if q != null else Look.TEXT_DIM)
+		Look.text(self, right.position + Vector2(56, 30), task.name, 20, Look.TEXT if q != null else Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, right.size.x - 70, "sans")
+		if row.target != "":
+			var bar := Rect2(right.position + Vector2(56, 44), Vector2(160, 12))
+			draw_rect(bar, Color(0.12, 0.12, 0.13))
+			draw_rect(Rect2(bar.position, Vector2(bar.size.x * clampf(row.progress / 100.0, 0.0, 1.0), bar.size.y)), Look.GOLD)
+			draw_rect(bar, Look.GOLD_DIM, false, 1.0)
+			Look.text(self, right.position + Vector2(226, 56), "%s %d%%" % [w.council.target_name(row.task, row.target), int(row.progress)], 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, right.size.x - 236, "sans")
+		elif q != null:
+			Look.text(self, right.position + Vector2(56, 56), hud.council_effect(row.task, q.skill(info.skill, day)), 14, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, right.size.x - 70, "sans")
 
 	## 战争窗口上半: 战争分数 (你这边看)、分数怎么来的、两边都有谁
 	func _war_header(win: Dictionary) -> void:
@@ -2880,6 +3284,13 @@ class Root:
 		var w := hud.world
 		var me := hud.me()
 		match row.type:
+			"gender":
+				var law := w.gender_law(hud.player)
+				var armed: bool = hud.window.armed == hud.window.rows.find(row)
+				Icons.draw(self, "decree", rr.position + Vector2(38, 38), 40, Look.GOLD)
+				Look.text(self, rr.position + Vector2(76, 30), "性别法: %s%s" % [World.GENDER_LAWS[law], "  (再点一次确定)" if armed else ""], 20, Look.RED if armed else Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, 600, "sans")
+				Look.text(self, rr.position + Vector2(76, 58), "只有男人能继承" if law == "male_only" else "家里没有能继承的男人时, 女人也能继承", 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, 500, "sans")
+				Look.text(self, rr.position + Vector2(rr.size.x - 120, 46), "改 ›", 17, Look.GOLD if hot(rr) else Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
 			"liege":
 				var l: Person = row.person
 				Look.text(self, rr.position + Vector2(76, 30), "效忠: %s %s" % [w.title_of(l), l.name], 20, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, 600, "sans")
@@ -3004,7 +3415,7 @@ class Root:
 			"人物窗口下面的按钮: 说亲、教育 (请老师)、互动 (送礼、收回领地、关大牢、宣战)",
 			"右边一列第一个「领地」: 你的直辖领地、封臣, 把领地封出去; 第二个「军队」: 征兵、解散",
 			"点地图上自己的军队选中它, 再右键点一块地, 军队就走过去 (隔海会坐船)",
-			"右边一列第五个「阴谋」: 暗杀、拉拢、秘密、把柄; 在别人的「互动」里开始",
+			"右边一列第四个「议会」: 大臣和他们干的活; 第五个「阴谋」: 暗杀、拉拢、秘密、把柄",
 			"右下角「≡」: 存档、读档、退出; 开局前横幅下面的「开局设置」",
 			"上方正中的小图标是提醒 (孩子没老师、有人该结婚了……), 点了直接去办",
 			"左下角最右边「决议」: 建立公国、王国 (别人拿着就是篡夺)、排解压力; 正中间弹出的事件选一个办法",
@@ -3118,7 +3529,7 @@ class Root:
 		elif kind == "vassal_succession":
 			var rel2 := w.relation(dead, heir)
 			lines.append(("撑不住了, %d 岁让出了领地。" if abdicated else "享年 %d 岁。") % dead.age(e.day))
-			lines.append("照%s, 由他的%s%s继承领地。" % [law, rel2 if rel2 != "" else "族人", heir.name])
+			lines.append("照%s, 由%s的%s%s继承领地。" % [law, "她" if dead.female else "他", rel2 if rel2 != "" else "族人", heir.name])
 			lines.append("你现在是%s %s (%d 岁)。" % [w.title_of(heir), heir.name, heir.age(e.day)])
 		elif over:
 			lines.append("%s去世了, 享年 %d 岁。" % [dead.name, dead.age(e.day)])
@@ -3128,7 +3539,7 @@ class Root:
 		else:
 			var rel := w.relation(dead, heir)
 			lines.append(("撑不住了, %d 岁让出了王位。" if abdicated else "享年 %d 岁。") % dead.age(e.day))
-			lines.append("照%s, 由他的%s%s继承%s。" % [law, rel if rel != "" else "族人", heir.name, e.realm_name])
+			lines.append("照%s, 由%s的%s%s继承%s。" % [law, "她" if dead.female else "他", rel if rel != "" else "族人", heir.name, e.realm_name])
 			for sp in e.splits:
 				var son: Person = w.people[sp[1]]
 				lines.append("%s%s分到了%s, 成了那里的国王。" % [w.relation(dead, son), son.name, w.realm_name(sp[0])])
