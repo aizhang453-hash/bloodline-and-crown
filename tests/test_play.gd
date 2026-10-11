@@ -1081,3 +1081,40 @@ func test_player_abdicates_from_breakdown() -> void:
 	eq(hud.player_id, heir.id, "让位以后接着玩继承人")
 	eq(hud.popup.get("kind", ""), "succession", "弹出继位的窗口")
 	check(hud.popup.event.abdicated)
+
+
+func test_match_sort_keeps_people() -> void:
+	main.play_as("wessex")
+	hud.show_person("alfred")
+	hud._open_match()
+	var before: Array = hud.window.rows.map(func(r: Dictionary) -> String: return r.person.id)
+	before.sort()
+	check(click_hud(hud._win_tab_rect(1, Hud.MATCH_TABS.size()).get_center()), "点「身份最高的在前」")
+	eq(hud.window.get("kind", ""), "match", "还是说亲窗口")
+	eq(hud.window.tab, 1)
+	var after: Array = hud.window.rows.map(func(r: Dictionary) -> String: return r.person.id)
+	after.sort()
+	eq(after, before, "换排法: 名单里的人不变 (不会又换一批本地贵族)")
+	var st: Array = hud.window.rows.map(func(r: Dictionary) -> int: return r.status)
+	for i in st.size() - 1:
+		check(st[i] >= st[i + 1], "身份高的在前")
+
+
+func test_rules_defaults_and_reset() -> void:
+	hud.open_rules()
+	click_hud(hud._rule_option(1, 1).get_center())  # 铁人模式: 开
+	hud = main.hud  # 改了设置会用新设置重新开一局 (界面也是新的)
+	eq(main.world.rules.ironman, "on", "改了设置")
+	eq(hud.popup.get("kind", ""), "rules", "改了以后还开着设置")
+	check(click_hud(hud._rules_reset().get_center()), "点「恢复默认」")
+	hud = main.hud
+	world = main.world
+	eq(main.world.rules, Rules.defaults(), "都换回默认的")
+	hud.close_popup()
+	main.play_as("wessex")
+	hud.open_rules()
+	var has_reset := false
+	for sp in hud._popup_spots:
+		if Rect2(sp.position, sp.size) == hud._rules_reset():
+			has_reset = true
+	check(not has_reset, "开始以后没有「恢复默认」")

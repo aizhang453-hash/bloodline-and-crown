@@ -55,7 +55,7 @@ const WINDOW := Rect2(580, 60, 820, 960)              # 右边到 1400 为止, �
 const WIN_ROW_Y := 244.0
 const WIN_ROW_H := 78.0
 const WIN_ROWS := 9
-const MATCH_TABS := ["最肯答应的", "身份最高的", "本事最好的"]
+const MATCH_TABS := ["最肯答应的在前", "身份最高的在前", "本事最好的在前"]   # 说亲名单的排法 (人不变, 只换先后)
 const NAME_BUTTON := Vector2(230, 46)                 # 起名窗口里一个名字的按钮
 const MENU_BOX := Rect2(610, 120, 700, 820)           # 菜单 (存档、读档)
 const MENU_ROWS := 8                                  # 存档名单一页几个
@@ -1062,6 +1062,12 @@ func _match_rows(p: Person, tab: int) -> Array:
 		for sk in Traits.SKILLS:
 			sum += c.skill(sk, day)
 		r.skills = sum
+	_sort_match_rows(rows, tab)
+	return rows
+
+
+## 说亲名单换排法 (照三代: 同一张名单, 只是重新排, 人不变)
+func _sort_match_rows(rows: Array, tab: int) -> void:
 	match tab:
 		0:
 			rows.sort_custom(func(x: Dictionary, y: Dictionary) -> bool:
@@ -1071,7 +1077,6 @@ func _match_rows(p: Person, tab: int) -> Array:
 				return x.status > y.status if x.status != y.status else x.acc.total > y.acc.total)
 		_:
 			rows.sort_custom(func(x: Dictionary, y: Dictionary) -> bool: return x.skills > y.skills)
-	return rows
 
 
 ## 能当老师的人, 学的那一样本事好的在前
@@ -1117,7 +1122,7 @@ func _make_window_spots() -> void:
 	_spot(Rect2(WINDOW.end.x - 52, WINDOW.position.y + 14, 38, 38), "关上", close_window, _window_spots)
 	if window.kind == "match":
 		for i in MATCH_TABS.size():
-			_spot(_win_tab_rect(i, MATCH_TABS.size()), "按「%s」排" % MATCH_TABS[i], _set_window_tab.bind(i), _window_spots)
+			_spot(_win_tab_rect(i, MATCH_TABS.size()), "换个排法: %s (名单里的人不变)" % MATCH_TABS[i], _set_window_tab.bind(i), _window_spots)
 	elif window.kind == "teacher":
 		var tracks: Array = Traits.data().education.tracks
 		for i in tracks.size():
@@ -1867,7 +1872,14 @@ func _teacher_tip(child: Person, r: Dictionary) -> String:
 
 
 func _set_window_tab(i: int) -> void:
-	_open_window("match", i)
+	if window.get("kind", "") != "match":
+		_open_window("match", i)
+		return
+	window.tab = i
+	window.page = 0
+	_sort_match_rows(window.rows, i)
+	_make_window_spots()
+	redraw()
 
 
 func _set_focus(skill: String) -> void:
@@ -2080,6 +2092,23 @@ func _make_rules() -> void:
 		for j in r[3].size():
 			_spot(_rule_option(i, j), r[2], _pick_rule.bind(r[0], r[3][j][0]), _popup_spots)
 	_spot(_menu_back(), "", close_popup, _popup_spots)
+	if player_id == "":
+		_spot(_rules_reset(), "每一条都换回默认的 (写着「默认」的那个)", _reset_rules, _popup_spots)
+
+
+## 开局设置里的「恢复默认」
+func _rules_reset() -> Rect2:
+	return Rect2(MENU_BOX.end.x - 230, MENU_BOX.end.y - 76, 200, 52)
+
+
+func _reset_rules() -> void:
+	if player_id != "":
+		return
+	if world.rules == Rules.defaults():
+		toast("现在就是默认的")
+		return
+	close_popup()
+	rules_changed.emit(Rules.defaults())
 
 
 func _rule_option(i: int, j: int) -> Rect2:
@@ -2196,6 +2225,7 @@ class Root:
 		return hud._hover_spot != null and hud._hover_spot.visible and Rect2(hud._hover_spot.position, hud._hover_spot.size).is_equal_approx(rect)
 
 	func _draw() -> void:
+		Look.begin_frame()
 		_top_bar()
 		_right_menu()
 		_bottom_left()
@@ -2429,7 +2459,18 @@ class Root:
 		draw_rect(CHAR_FACE.grow(2), Look.GOLD_DIM, false, 2.0)
 		Look.text_center(self, Rect2(r.end.x - 52, 14, 38, 38), "✕", 24, Look.TEXT if hot(Rect2(r.end.x - 52, 14, 38, 38)) else Look.TEXT_DIM, "sans")
 		# 名字、头衔、岁数、文化
-		Look.text(self, Vector2(284, 76), p.name, 34 if p.name.length() <= 6 else 26, Look.TEXT)
+		var name_size := 34 if p.name.length() <= 6 else 26
+		if Look.font().get_string_size(p.name, HORIZONTAL_ALIGNMENT_LEFT, -1, name_size).x > 224 and p.name.contains("·"):
+			# 长名字 (爱尔兰人带父名: 梅尔·辛希尔·麦克·穆格龙) 在中间的「·」那里分两行
+			var cut := p.name.length() / 2
+			var best := -1
+			for i in p.name.length():
+				if p.name[i] == "·" and (best < 0 or absi(i - cut) < absi(best - cut)):
+					best = i
+			Look.text(self, Vector2(284, 58), p.name.left(best + 1), 24, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, 224)
+			Look.text(self, Vector2(284, 88), p.name.substr(best + 1), 24, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, 224)
+		else:
+			Look.text(self, Vector2(284, 76), p.name, name_size, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, 224)
 		var title := w.title_of(p) if p.alive else ""
 		if title != "":
 			Look.text(self, Vector2(286, 110), title, 18, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, 250, "sans")
@@ -2873,7 +2914,7 @@ class Root:
 		draw_rect(Rect2(r.position, Vector2(r.size.x, 150)), Color(realm.color, 0.35))
 		draw_line(Vector2(0, 150), Vector2(r.size.x, 150), Look.GOLD_DIM, 2.0)
 		_shield(Rect2(28, 26, 80, 96), c.holder)
-		Look.text(self, Vector2(130, 68), c.name, 44, Look.TEXT)
+		Look.text(self, Vector2(130, 68), c.name, 44, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, 370)
 		Look.text(self, Vector2(132, 102), "伯爵领 · 属于%s公国" % w.duchy_of(c).name, 18, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
 		Look.text(self, Vector2(132, 128), "%s王国 · %s帝国 (按法理)" % [w.kingdom_of(c).name, w.empire.name], 18, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
 		Look.text_center(self, Rect2(r.end.x - 52, 14, 38, 38), "✕", 24, Look.TEXT if hot(Rect2(r.end.x - 52, 14, 38, 38)) else Look.TEXT_DIM, "sans")
@@ -2884,7 +2925,7 @@ class Root:
 		draw_rect(PANEL_FACE.grow(1), Look.GOLD_DIM, false, 1.5)
 		Look.text(self, Vector2(176, y), "主人", 20, Look.GOLD)
 		Look.text(self, Vector2(176, y + 36), w.title_of(lord), 18, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
-		Look.text(self, Vector2(176, y + 72), lord.name, 30, Look.TEXT)
+		Look.text(self, Vector2(176, y + 72), lord.name, 30, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 206)
 		var born_text := "%d 岁 (%d 年生)" % [lord.age(hud.clock.day), GameDate.from_day(lord.birth_day)[0]]
 		Look.text(self, Vector2(176, y + 104), born_text, 17, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
 		y = 240.0
@@ -2902,7 +2943,7 @@ class Root:
 		draw_line(Vector2(30, y - 30), Vector2(r.size.x - 30, y - 30), Color(Look.GOLD_DIM, 0.5), 1.0)
 		Look.text(self, Vector2(40, y), "这块领地", 20, Look.GOLD)
 		var wf := w.warfare
-		Look.text(self, Vector2(40, y + 34), "面积: %d 平方公里%s · 城墙 %d 级 (守军 %d/%d)" % [c.area_km2, " · 靠海" if c.coastal else " · 不靠海", wf.fort(c), int(c.garrison), int(wf.max_garrison(c))], 19, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+		Look.text(self, Vector2(40, y + 34), "%d 平方公里 · %s · 城墙 %d 级 · 守军 %d/%d" % [c.area_km2, "靠海" if c.coastal else "不靠海", wf.fort(c), int(c.garrison), int(wf.max_garrison(c))], 19, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 80, "sans")
 		var war_line := ""
 		if c.occupier != "" and w.people.has(c.occupier):
 			war_line = "被%s占领了 (不出钱、不出兵)" % hud._side_name(c.occupier)
@@ -3173,7 +3214,7 @@ class Root:
 		Look.panel(self, r, Color(0.07, 0.075, 0.09, 1.0))
 		Look.text_center(self, Rect2(r.position.x, r.position.y + 20, r.size.x, 56), "开局设置", 34, Look.GOLD)
 		Look.text_center(self, Rect2(r.position.x, r.position.y + 70, r.size.x, 30),
-				"选好了再选人开始; 开始以后不能改" if editable else "游戏开始以后不能改, 只能看", 16, Look.TEXT_DIM, "sans")
+				"不改就照默认的玩 (写着「默认」的那个); 开始以后不能改" if editable else "游戏开始以后不能改, 只能看", 16, Look.TEXT_DIM, "sans")
 		for i in Rules.LIST.size():
 			var rule: Array = Rules.LIST[i]
 			var y: float = r.position.y + 120 + i * 125
@@ -3182,10 +3223,12 @@ class Root:
 			for j in rule[3].size():
 				var br := hud._rule_option(i, j)
 				var on: bool = w.rules[rule[0]] == rule[3][j][0]
-				draw_rect(br, Color(0.2, 0.17, 0.11) if on else Color(0.11, 0.115, 0.13))
-				draw_rect(br, Look.GOLD if on or (hot(br) and editable) else Look.GOLD_DIM, false, 2.0)
-				Look.text_center(self, br, rule[3][j][1], 17, Look.TEXT if on else Look.TEXT_DIM, "sans")
+				draw_rect(br, Color(0.3, 0.24, 0.12) if on else Color(0.11, 0.115, 0.13))
+				draw_rect(br, Look.GOLD if on or (hot(br) and editable) else Color(Look.GOLD_DIM, 0.6), false, 3.0 if on else 1.5)
+				Look.text_center(self, br, ("✓ " if on else "") + rule[3][j][1] + (" (默认)" if j == 0 else ""), 17, Look.TEXT if on else Look.TEXT_DIM, "sans")
 		_wide_button(hud._menu_back(), "开始选人" if editable else "返回", true)
+		if editable:
+			_wide_button(hud._rules_reset(), "恢复默认", false)
 
 	# ---- 正中间的窗口: 菜单 (存档、读档、退出) ----
 	func _menu_popup() -> void:

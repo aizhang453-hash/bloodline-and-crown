@@ -34,24 +34,66 @@ static func font(kind := "serif") -> Font:
 	return _fonts[kind]
 
 
+# 查字有没有超出框 (测试用, tests/text_fit.gd 打开): 字 -> 超出了多少
+static var check := false
+static var overflows := {}
+static var _boxes: Array = []   # 这一帧画过的面板 (没给宽度的字, 看它有没有超出所在的面板)
+const MIN_SHRINK := 0.75        # 放不下的字最多缩到 75%
+
+
+## 每一帧开头 (界面的 _draw 最前面) 调用
+static func begin_frame() -> void:
+	_boxes.clear()
+
+
 ## 一块面板: 深色底 + 暗金色描边
 static func panel(ci: CanvasItem, r: Rect2, fill := PANEL, trim := true) -> void:
 	ci.draw_rect(r, fill)
 	if trim:
 		ci.draw_rect(r, GOLD_DIM, false, 2.0)
 		ci.draw_rect(r.grow(-4), Color(GOLD_DIM, 0.35), false, 1.0)
+	if check:
+		_boxes.append(r)
 
 
+## 写一行字。给了宽度的, 放不下就把字缩小一点 (最多缩到 75%)
 static func text(ci: CanvasItem, pos: Vector2, s: String, size: int, color := TEXT,
 		align := HORIZONTAL_ALIGNMENT_LEFT, width := -1.0, kind := "serif") -> void:
-	ci.draw_string(font(kind), pos, s, align, width, size, color)
+	var f := font(kind)
+	var w := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	if width > 0.0 and w > width:
+		var smaller := maxi(int(size * MIN_SHRINK), int(size * width / w))
+		w = w * smaller / size
+		size = smaller
+	ci.draw_string(f, pos, s, align, width, size, color)
+	if check:
+		if width > 0.0:
+			_note(s, w - width)
+		else:
+			for i in range(_boxes.size() - 1, -1, -1):
+				var b: Rect2 = _boxes[i]
+				if b.has_point(pos + Vector2(1, -2)):
+					_note(s, pos.x + w - (b.end.x - 6))
+					break
 
 
-## 在 r 里居中写一行字
+## 在 r 里居中写一行字 (放不下就缩小一点)
 static func text_center(ci: CanvasItem, r: Rect2, s: String, size: int, color := TEXT, kind := "serif") -> void:
 	var f := font(kind)
+	var w := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	if w > r.size.x - 8:
+		var smaller := maxi(int(size * MIN_SHRINK), int(size * (r.size.x - 8) / w))
+		w = w * smaller / size
+		size = smaller
 	var y := r.position.y + (r.size.y + f.get_ascent(size) - f.get_descent(size)) / 2.0
 	ci.draw_string(f, Vector2(r.position.x, y), s, HORIZONTAL_ALIGNMENT_CENTER, r.size.x, size, color)
+	if check:
+		_note(s, w - r.size.x)
+
+
+static func _note(s: String, over: float) -> void:
+	if over > 0.5:
+		overflows[s] = maxf(over, float(overflows.get(s, 0.0)))
 
 
 ## 圆按钮: 深色圆 + 金圈, 中间一个小图标 (Icons 里的名字)
