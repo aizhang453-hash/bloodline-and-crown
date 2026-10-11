@@ -151,13 +151,25 @@ func test_monthly_prestige_and_coming_of_age() -> void:
 
 
 func test_long_run_stays_consistent() -> void:
-	# 让时间走 150 年 (每次一个月), 每次检查: 每个国家都有活着的国王, 领地都有主人, 没人同时当两个国家的国王
+	# 让时间走 150 年 (每次一个月), 每次检查: 每个国家都有活着的国王, 领地都有主人, 没人同时当两个国家的国王;
+	# 第 4 块: 配偶两边对得上、只有结了婚的女人怀孕; 最后量: 平均生几个、多少孩子长不大、人数没有失控
 	var day := w.start_day
 	var deaths := 0
+	var births := 0
+	var marriages := 0
 	for m in 150 * 12:
 		day += 30
 		var events := w.advance(30, day)
 		deaths += events.filter(func(e: Dictionary) -> bool: return e.type == "death").size()
+		births += events.filter(func(e: Dictionary) -> bool: return e.type == "birth").size()
+		marriages += events.filter(func(e: Dictionary) -> bool: return e.type == "marriage").size()
+		if m % 12 == 0:
+			for p in w.living.values():
+				if p.married():
+					var s: Person = p.living_spouse()
+					check(s.spouse == p.id or s.secondary.has(p.id), "%s 的配偶对得上" % p.name)
+				if not p.pregnant.is_empty():
+					check(p.female and w.people.has(p.pregnant.father), "%s 怀孕的是女人, 孩子父亲在" % p.name)
 		var rulers := {}
 		for id in w.realm_order:
 			var r := w.ruler(id)
@@ -171,3 +183,22 @@ func test_long_run_stays_consistent() -> void:
 			failures.append("第 %d 个月出的错" % m)
 			return
 	check(deaths > 80, "150 年里死了不少人 (%d)" % deaths)
+	check(births > 1000 and marriages > 300, "150 年里结了 %d 次婚, 生了 %d 次孩子" % [marriages, births])
+	var kids := []
+	var young := 0
+	var grown := 0
+	for p in w.people.values():
+		if p.female and not p.alive and p.birth_day > w.start_day and (p.spouse != "" or not p.former_spouses.is_empty()):
+			kids.append(w.children_of(p).size())
+		if p.birth_day > w.start_day and day - p.birth_day > 16 * 365:
+			grown += 1
+			if not p.alive and p.age(p.death_day) < 16:
+				young += 1
+	var avg := 0.0
+	for k in kids:
+		avg += k
+	avg /= maxf(1.0, kids.size())
+	check(avg >= 3.5 and avg <= 6.0, "结过婚的女人平均生 %.1f 个 (定的 4–6 个)" % avg)
+	var share := young / maxf(1.0, grown)
+	check(share > 0.13 and share < 0.27, "%.0f%% 的孩子长不到 16 岁 (定的大约五个里一个)" % (share * 100))
+	check(w.living.size() < 2500, "150 年后活着 %d 人, 没有失控" % w.living.size())

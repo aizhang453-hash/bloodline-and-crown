@@ -7,9 +7,9 @@ extends RefCounted
 
 const NAMES := {"seniority": "长者继承", "partition": "平分继承", "tanistry": "推举继承"}
 const DESCS := {
-	"seniority": "家族里年纪最大的男人继承 (哥哥死了常常是弟弟接)。威塞克斯就是这样: 埃塞尔雷德之后是弟弟阿尔弗雷德, 不是他年幼的儿子",
-	"partition": "儿子们分家: 长子拿主要的王国, 手里别的王国分给下面的儿子, 各自当国王。罗德里大王死后他的王国就是这样分的",
-	"tanistry": "家族里的男人推举继承人, 一般选成年、本事好的, 不一定是儿子。阿尔巴开国的基纳德死后就是他弟弟继位",
+	"seniority": "家族里年纪最大的男人继承 (哥哥死了常常是弟弟接, 不是年幼的儿子)",
+	"partition": "儿子们分家: 长子拿主要的王国, 手里别的王国分给下面的儿子, 各自当国王",
+	"tanistry": "家族里的男人推举继承人, 一般选成年、本事好的, 不一定是儿子",
 }
 
 
@@ -25,18 +25,24 @@ static func law_of(culture: String) -> String:
 
 ## 能继承的人, 排好先后 (第一个就是继承人)。ruler 是现在的国王 (或者刚死的国王), 他自己不算
 static func candidates(w: World, realm_id: String, ruler: Person, day: int) -> Array:
-	var realm: Dictionary = w.realms[realm_id]
+	return candidates_for(w, ruler, law_of(w.realms[realm_id].culture), day)
+
+
+## 照 law 这种继承法, 谁来接 holder 的东西 (国王的国家, 或者封臣的领地; 第 5 块)
+static func candidates_for(w: World, ruler: Person, law: String, day: int) -> Array:
 	var house: String = ruler.house
-	var law := law_of(realm.culture)
-	var men: Array = w.people.values().filter(func(p: Person) -> bool:
-		return p.alive and not p.female and p.id != ruler.id and house != "" and p.house == house)
+	var men: Array = w.house_members(house).filter(func(p: Person) -> bool:
+		return p.alive and not p.female and p.id != ruler.id and house != "")
 	match law:
 		"seniority":
 			men.sort_custom(func(a: Person, b: Person) -> bool: return a.birth_day < b.birth_day)
 		"tanistry":
+			var scores := {}
+			for m in men:
+				scores[m.id] = tanist_score(m, day)
 			men.sort_custom(func(a: Person, b: Person) -> bool:
-				var sa := tanist_score(a, day)
-				var sb := tanist_score(b, day)
+				var sa: int = scores[a.id]
+				var sb: int = scores[b.id]
 				return sa > sb if sa != sb else a.birth_day < b.birth_day)
 		_:
 			# 平分: 先儿子 (大的在前), 再兄弟, 再家族里别的男人 (都是年纪大的在前)

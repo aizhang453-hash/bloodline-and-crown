@@ -17,7 +17,7 @@ const FLAME_CORE := Color("fff0a0")
 ## 所有图标的名字 (测试用)
 const NAMES := ["coins", "crown", "coronet", "imperial_crown", "cross", "tree", "helmet", "tower", "swords",
 		"throne", "council", "intrigue", "torch", "quill", "chalice", "book", "candle", "banner", "bust",
-		"decree", "house", "mountain", "plus"]
+		"decree", "house", "mountain", "plus", "rings", "cradle"]
 
 
 static func draw(ci: CanvasItem, name: String, c: Vector2, s: float, col: Color) -> void:
@@ -140,6 +140,20 @@ static func draw(ci: CanvasItem, name: String, c: Vector2, s: float, col: Color)
 		"plus":
 			_line(ci, t, Vector2(-0.3, 0), Vector2(0.3, 0), col, 0.1)
 			_line(ci, t, Vector2(0, -0.3), Vector2(0, 0.3), col, 0.1)
+		"rings":  # 两个套在一起的结婚戒指, 一个上面有颗宝石 (说亲)
+			ci.draw_arc(t * Vector2(-0.13, 0.08), 0.24 * s, 0, TAU, 32, col.darkened(0.2), maxf(2.0, s * 0.09), true)
+			ci.draw_arc(t * Vector2(0.13, 0.08), 0.24 * s, 0, TAU, 32, col, maxf(2.0, s * 0.09), true)
+			_poly(ci, t, [Vector2(0.13, -0.3), Vector2(0.22, -0.2), Vector2(0.13, -0.1), Vector2(0.04, -0.2)], WAX)
+		"cradle":  # 木摇篮, 里面躺着包好的婴儿
+			_half_ellipse(ci, t, Vector2(0, -0.02), Vector2(0.42, -0.34), WOOD)
+			_poly(ci, t, [Vector2(-0.42, -0.06), Vector2(-0.3, -0.36), Vector2(-0.22, -0.06)], WOOD.darkened(0.15))
+			_ellipse(ci, t, Vector2(0.06, -0.08), Vector2(0.24, 0.1), SILVER)
+			_circle(ci, t, Vector2(-0.14, -0.12), 0.09, Color("f0d0b0"))
+			var rocker := PackedVector2Array()
+			for k in 13:
+				var a := PI * 0.2 + PI * 0.6 * k / 12.0
+				rocker.append(t * (Vector2(cos(a) * 0.48, sin(a) * 0.2 + 0.2)))
+			ci.draw_polyline(rocker, col, maxf(2.0, t.get_scale().x * 0.07), true)
 		_:
 			if not _pictogram(ci, name, t, col):
 				push_error("没有这个图标: " + name)
@@ -153,6 +167,7 @@ const BADGE := {
 	"good": [Color("27432a"), Color("8fbf6a")],
 	"bad": [Color("4a2424"), Color("c06a5a")],
 	"education": [Color("24344a"), Color("7fa0c8")],
+	"childhood": [Color("2e4040"), Color("8cc0b0")],
 	"skill": [Color("2a2c33"), Color("8a7a5a")],
 }
 const SKILL_ICONS := {
@@ -169,8 +184,8 @@ static func trait_icon(ci: CanvasItem, what: Variant, c: Vector2, size: float) -
 		_pips(ci, c, size, int(what.level), Color("a8c8f0"))
 		return
 	var info := Traits.get_trait(what)
-	if info.get("kind", "") == "personality":
-		_badge(ci, "personality", c, size)
+	if info.get("kind", "") in ["personality", "childhood"]:
+		_badge(ci, info.kind, c, size)
 		draw(ci, "p_" + String(what), c, size * 0.72, INK)
 		return
 	var good: bool = info.get("good", false)
@@ -444,6 +459,42 @@ static func _pictogram(ci: CanvasItem, name: String, t: Transform2D, col: Color)
 			for k in 3:
 				var x := -0.36 + k * 0.26
 				_poly(ci, t, [Vector2(x, -0.08 + k * 0.04), Vector2(x + 0.18, -0.08 + k * 0.04), Vector2(x + 0.18, 0.08 + k * 0.04), Vector2(x, 0.08 + k * 0.04)], PARCHMENT)
+		"p_rowdy":  # 淘气: 木头剑和皮球
+			_line(ci, t, Vector2(-0.34, 0.36), Vector2(0.12, -0.38), Color("c89a68"), 0.08)
+			_line(ci, t, Vector2(-0.3, 0.12), Vector2(-0.08, 0.26), Color("8a5a32"), 0.07)
+			_circle(ci, t, Vector2(0.22, 0.22), 0.17, Color("c84a3a"))
+			_line(ci, t, Vector2(0.06, 0.22), Vector2(0.38, 0.22), Color("f4f0e6"), 0.04)
+		"p_charming":  # 讨人喜欢: 雏菊
+			for k in 8:
+				var a := TAU * k / 8.0
+				_ellipse(ci, t, Vector2(cos(a), sin(a)) * 0.22 + Vector2(0, -0.06), Vector2(0.1, 0.1), Color("f4f0e6"))
+			_circle(ci, t, Vector2(0, -0.06), 0.12, Color("f0c040"))
+			_line(ci, t, Vector2(0, 0.2), Vector2(0, 0.46), Color("6aa060"), 0.05)
+		"p_curious":  # 好奇: 一把老钥匙
+			var s := t.get_scale().x
+			ci.draw_arc(t * Vector2(-0.22, -0.18), 0.15 * s, 0, TAU, 24, Color("c8a050"), maxf(1.5, s * 0.07), true)
+			_line(ci, t, Vector2(-0.12, -0.08), Vector2(0.34, 0.38), Color("c8a050"), 0.07)
+			_line(ci, t, Vector2(0.22, 0.26), Vector2(0.32, 0.16), Color("c8a050"), 0.06)
+			_line(ci, t, Vector2(0.3, 0.34), Vector2(0.4, 0.24), Color("c8a050"), 0.06)
+		"p_pensive":  # 爱琢磨: 一盏油灯
+			_poly(ci, t, [Vector2(-0.36, 0.1), Vector2(0.2, 0.1), Vector2(0.36, -0.02), Vector2(0.26, 0.24), Vector2(-0.3, 0.24)], Color("b07a4a"))
+			_line(ci, t, Vector2(-0.36, 0.14), Vector2(-0.44, 0.02), Color("b07a4a"), 0.05)
+			_poly(ci, t, [Vector2(0.3, -0.42), Vector2(0.38, -0.2), Vector2(0.3, -0.06), Vector2(0.22, -0.2)], FLAME)
+			_poly(ci, t, [Vector2(0.3, -0.28), Vector2(0.34, -0.18), Vector2(0.3, -0.1), Vector2(0.26, -0.18)], FLAME_CORE, false)
+		"p_bossy":  # 爱管人: 举起来的小权杖
+			_line(ci, t, Vector2(-0.2, 0.44), Vector2(0.14, -0.22), Color("a07040"), 0.08)
+			_circle(ci, t, Vector2(0.18, -0.3), 0.12, GOLD)
+			_poly(ci, t, [Vector2(0.06, -0.12), Vector2(0.4, 0.0), Vector2(0.06, 0.06)], WAX)
+		"p_inbred":  # 近亲繁殖: 枯萎低头的花
+			var stem := PackedVector2Array()
+			for k in 9:
+				var f := k / 8.0
+				stem.append(t * Vector2(-0.1 + sin(f * 2.2) * 0.3, 0.46 - f * 0.66))
+			ci.draw_polyline(stem, Color("7a8a5a"), maxf(1.5, t.get_scale().x * 0.05), true)
+			for k in 5:
+				var a := PI * 0.15 + PI * 0.7 * k / 4.0
+				_ellipse(ci, t, Vector2(0.2, -0.16) + Vector2(cos(a), sin(a)) * 0.13, Vector2(0.07, 0.11), Color("9a8aa0"))
+			_circle(ci, t, Vector2(0.2, -0.16), 0.06, Color("6a6058"))
 		"p_round_shield":  # 圆盾 (武力)
 			_circle(ci, t, Vector2.ZERO, 0.42, Color("8a5a3a"))
 			for k in 6:

@@ -1,5 +1,5 @@
 {
- "说明": "867 年 1 月 1 日的不列颠群岛。爵位: 帝国 > 王国 > 公国 > 领地 (伯爵领)。holder 是开局时这块领地归哪个国家。ruler 为 null 的国家开局时随机生成统治者 (用 culture 那种文化的名字)。born 是统治者的生年, born_estimated 为 true 是史料没记、估计的。looks 是史料里讲到的长相 (盖过随机的长相基因)。 personality 是史料里能看出来的性格 (不够 3 个随机补), base_skills 是史料里看得出擅长的本事 (底子 8 = 中上, 10 = 高); 都写在 note 里。 house 是家族 (houses 里有名字); titles 是手里的几个公国一级头衔 (平分继承时分给儿子们)。family 是开局有记载的家人 (born 生年估计, died 卒年, 有 died 的开局已经去世, 用来连起家谱)。",
+ "说明": "867 年 1 月 1 日的不列颠群岛。爵位: 帝国 > 王国 > 公国 > 领地 (伯爵领)。holder 是开局时这块领地归哪个国家。ruler 为 null 的国家开局时随机生成统治者 (用 culture 那种文化的名字)。born 是统治者的生年, born_estimated 为 true 是史料没记、估计的。looks 是史料里讲到的长相 (盖过随机的长相基因)。 personality 是史料里能看出来的性格 (不够 3 个随机补), base_skills 是史料里看得出擅长的本事 (底子 8 = 中上, 10 = 高); 都写在 note 里。 house 是家族 (houses 里有名字); titles 是手里的几个公国一级头衔 (平分继承时分给儿子们)。family 是开局有记载的家人 (born 生年估计, died 卒年, 有 died 的开局已经去世, 用来连起家谱)。 former_spouses 是以前的配偶 (死了的); history 是开局以后史料里的婚事和孩子 (第 4 块): marriages 两个人都在、都活着、都没结婚、不是玩家家里的人, 到了 year 年电脑照史料安排; children 是这对父母 (没写 mother 的只看父亲) 史料里的孩子, 生男生女还是随机的, 生出来按顺序用史料里的名字。 vassals 是开局有记载的封臣 (第 5 块): county 是他管的领地; 别的封臣随机生成。",
  "start_date": [
   867,
   1,
@@ -1756,6 +1756,41 @@
    "id": "dal_naraidi",
    "name": "达尔纳莱德家族",
    "desc": "乌莱德的达尔纳莱德王族"
+  },
+  {
+   "id": "gaini",
+   "name": "盖尼家族",
+   "desc": "埃尔斯维斯的娘家: 麦西亚的盖尼人, 父亲埃塞尔雷德·穆赫尔是那里的郡长, 母亲埃德伯是麦西亚王族"
+  },
+  {
+   "id": "brega",
+   "name": "布雷加王族",
+   "desc": "布雷加 (米斯东边) 的王族, 乌伊尼尔的斯尔·奈多·斯拉内一支"
+  },
+  {
+   "id": "berkshire_house",
+   "name": "埃塞尔伍尔夫家族",
+   "desc": "伯克郡郡长埃塞尔伍尔夫的家族 (祖上不详; 编年史说他是麦西亚人)"
+  },
+  {
+   "id": "wulfhere_house",
+   "name": "伍尔夫希尔家族",
+   "desc": "威尔特郡郡长伍尔夫希尔的家族 (祖上不详)"
+  },
+  {
+   "id": "airgialla",
+   "name": "艾尔吉亚拉王族",
+   "desc": "艾尔吉亚拉的王族"
+  },
+  {
+   "id": "ui_chennselaig",
+   "name": "乌伊亨塞拉格家族",
+   "desc": "伦斯特南部乌伊亨塞拉格 (弗恩斯一带) 的王族"
+  },
+  {
+   "id": "ui_failge",
+   "name": "乌伊法尔吉王族",
+   "desc": "伦斯特西部乌伊法尔吉的王族"
   }
  ],
  "family": [
@@ -2302,7 +2337,10 @@
    "culture": "gaelic",
    "note": "凯尔伯尔的妹妹, 先嫁给前一任至尊王, 后来嫁给艾德",
    "father": "dungal",
-   "spouse": "ruler_ailech"
+   "spouse": "ruler_ailech",
+   "former_spouses": [
+    "mael_sechnaill"
+   ]
   },
   {
    "id": "domnall_ailech",
@@ -2397,6 +2435,597 @@
    "note": "凯尔伯尔的女儿, 萨迦说后来嫁给奥克尼伯爵",
    "father": "ruler_osraige",
    "mother": "mael_felbha"
+  },
+  {
+   "id": "mael_sechnaill",
+   "name": "梅尔·塞赫纳尔",
+   "female": false,
+   "born": 810,
+   "house": "clann_cholmain",
+   "culture": "gaelic",
+   "note": "至尊王, 862 年去世。兰的第一个丈夫, 弗兰·辛纳的父亲",
+   "died": 862,
+   "former_spouses": [
+    "land"
+   ]
+  },
+  {
+   "id": "flann_sinna",
+   "name": "弗兰·辛纳",
+   "female": false,
+   "born": 847,
+   "house": "clann_cholmain",
+   "culture": "gaelic",
+   "father": "mael_sechnaill",
+   "mother": "land",
+   "note": "至尊王梅尔·塞赫纳尔和兰的儿子 (年鉴记他 847 或 848 年生)。史料里: 877 年当了米斯国王, 879 年当了至尊王"
+  },
+  {
+   "id": "ealhswith",
+   "name": "埃尔斯维斯",
+   "female": true,
+   "born": 851,
+   "house": "gaini",
+   "culture": "anglo_saxon",
+   "note": "麦西亚贵族的女儿: 父亲埃塞尔雷德·穆赫尔是盖尼人的郡长, 母亲埃德伯是麦西亚王族。史料里: 868 年嫁给阿尔弗雷德。生年不详, 估计",
+   "father": "aethelred_mucel"
+  },
+  {
+   "id": "gormlaith_brega",
+   "name": "格尔姆莱斯",
+   "female": true,
+   "born": 851,
+   "house": "brega",
+   "culture": "gaelic",
+   "note": "布雷加国王弗兰·麦克·科奈英的女儿 (《名女录》)。史料里: 多半是弗兰·辛纳的第一个妻子, 生了唐哈德和女儿格尔姆莱斯。生年不详, 估计",
+   "father": "flann_mac_conaing"
+  },
+  {
+   "id": "aethelwulf_gaini",
+   "name": "埃塞尔伍尔夫",
+   "female": false,
+   "born": 848,
+   "house": "gaini",
+   "culture": "anglo_saxon",
+   "father": "aethelred_mucel",
+   "note": "埃塞尔雷德·穆赫尔的儿子, 埃尔斯维斯的弟弟 (史料: 后来当了郡长, 903 年去世)。生年估计"
+  }
+ ],
+ "history": {
+  "marriages": [
+   {
+    "a": "alfred",
+    "b": "ealhswith",
+    "year": 868,
+    "note": "阿瑟《阿尔弗雷德传》: 868 年阿尔弗雷德娶了麦西亚贵族的女儿埃尔斯维斯"
+   },
+   {
+    "a": "flann_sinna",
+    "b": "gormlaith_brega",
+    "year": 868,
+    "note": "《名女录》: 布雷加的格尔姆莱斯是弗兰·辛纳的妻子 (多半是第一个), 女儿格尔姆莱斯约 870 年生"
+   },
+   {
+    "a": "ruler_ailech",
+    "b": "mael_muire",
+    "year": 868,
+    "note": "艾德·芬德利亚斯娶了基纳德的女儿梅尔穆雷, 生了后来的至尊王尼尔。爱尔兰古法准许再娶: 兰是正妻, 梅尔穆雷做次妻"
+   },
+   {
+    "a": "flann_sinna",
+    "b": "eithne_ailech",
+    "year": 877,
+    "note": "弗兰·辛纳约 877 年娶了艾德·芬德利亚斯的女儿埃斯尼"
+   },
+   {
+    "a": "flann_sinna",
+    "b": "mael_muire",
+    "year": 879,
+    "note": "艾德·芬德利亚斯 879 年死后, 梅尔穆雷改嫁给继位的至尊王弗兰·辛纳"
+   },
+   {
+    "a": "hywel_dda",
+    "b": "elen_llywarch",
+    "year": 0,
+    "note": "传说「好人」休厄尔娶了德费德国王利瓦尔赫的女儿埃伦"
+   },
+   {
+    "a": "niall_glundub",
+    "b": "gormlaith_flann",
+    "year": 0,
+    "note": "尼尔·格伦杜布娶了弗兰·辛纳的女儿格尔姆莱斯 (她的第三个丈夫)"
+   }
+  ],
+  "children": [
+   {
+    "father": "alfred",
+    "mother": "ealhswith",
+    "kids": [
+     {
+      "id": "aethelflaed",
+      "name": "埃塞尔弗莱德",
+      "female": true,
+      "note": "史料里: 阿尔弗雷德的长女 (约 870 年生), 后来人称「麦西亚夫人」, 带兵跟维京人打仗"
+     },
+     {
+      "id": "edward_elder",
+      "name": "爱德华",
+      "female": false,
+      "note": "史料里: 阿尔弗雷德的长子 (约 874 年生), 后来的威塞克斯国王「长者」爱德华"
+     },
+     {
+      "id": "aethelgifu",
+      "name": "埃塞尔吉夫",
+      "female": true,
+      "note": "史料里: 阿尔弗雷德的女儿, 后来当了沙夫茨伯里修道院院长"
+     },
+     {
+      "id": "aelfthryth",
+      "name": "埃尔夫思里斯",
+      "female": true,
+      "note": "史料里: 阿尔弗雷德的小女儿, 后来嫁给弗兰德斯伯爵"
+     },
+     {
+      "id": "aethelweard",
+      "name": "埃塞尔沃德",
+      "female": false,
+      "note": "史料里: 阿尔弗雷德的小儿子, 阿瑟说他在宫廷学校里读书"
+     }
+    ]
+   },
+   {
+    "father": "edward_elder",
+    "kids": [
+     {
+      "id": "aethelstan",
+      "name": "埃塞尔斯坦",
+      "female": false,
+      "note": "史料里: 「长者」爱德华的长子 (约 894 年生), 后来第一个统治整个英格兰的国王"
+     },
+     {
+      "id": "aelfweard",
+      "name": "埃尔夫沃德",
+      "female": false,
+      "note": "史料里: 「长者」爱德华的儿子, 924 年死"
+     },
+     {
+      "id": "edwin_edward",
+      "name": "埃德温",
+      "female": false,
+      "note": "史料里: 「长者」爱德华的儿子, 933 年淹死在海上"
+     },
+     {
+      "id": "edmund_edward",
+      "name": "埃德蒙",
+      "female": false,
+      "note": "史料里: 「长者」爱德华的儿子, 后来的英格兰国王埃德蒙一世"
+     },
+     {
+      "id": "eadred",
+      "name": "埃德雷德",
+      "female": false,
+      "note": "史料里: 「长者」爱德华的小儿子, 后来的英格兰国王"
+     },
+     {
+      "id": "aethelhild",
+      "name": "埃塞尔希尔德",
+      "female": true,
+      "note": "史料里: 「长者」爱德华的女儿, 在威尔顿修道院"
+     },
+     {
+      "id": "eadgifu_edward",
+      "name": "埃德吉夫",
+      "female": true,
+      "note": "史料里: 「长者」爱德华的女儿, 嫁给西法兰克国王「糊涂」查理"
+     },
+     {
+      "id": "eadflaed",
+      "name": "埃德弗莱德",
+      "female": true,
+      "note": "史料里: 「长者」爱德华的女儿, 威尔顿修道院的修女"
+     },
+     {
+      "id": "eadhild",
+      "name": "埃德希尔德",
+      "female": true,
+      "note": "史料里: 「长者」爱德华的女儿, 嫁给法兰克的「大」于格"
+     },
+     {
+      "id": "eadgyth",
+      "name": "埃德吉斯",
+      "female": true,
+      "note": "史料里: 「长者」爱德华的女儿, 嫁给后来的皇帝奥托一世"
+     },
+     {
+      "id": "aelfgifu_edward",
+      "name": "埃尔夫吉夫",
+      "female": true,
+      "note": "史料里: 「长者」爱德华的女儿, 嫁给「阿尔卑斯山附近的一位王子」"
+     },
+     {
+      "id": "eadburh_edward",
+      "name": "埃德伯",
+      "female": true,
+      "note": "史料里: 「长者」爱德华的女儿, 修女, 后来被尊为圣人"
+     }
+    ]
+   },
+   {
+    "father": "ruler_ailech",
+    "mother": "mael_muire",
+    "kids": [
+     {
+      "id": "niall_glundub",
+      "name": "尼尔",
+      "female": false,
+      "note": "史料里: 艾德·芬德利亚斯和梅尔穆雷的儿子, 后来的至尊王「黑膝」尼尔 (919 年战死)"
+     }
+    ]
+   },
+   {
+    "father": "niall_glundub",
+    "kids": [
+     {
+      "id": "muirchertach",
+      "name": "穆尔赫尔塔赫",
+      "female": false,
+      "note": "史料里: 「黑膝」尼尔的儿子, 后来的艾莱赫国王「皮斗篷」穆尔赫尔塔赫"
+     }
+    ]
+   },
+   {
+    "father": "flann_sinna",
+    "mother": "gormlaith_brega",
+    "kids": [
+     {
+      "id": "gormlaith_flann",
+      "name": "格尔姆莱斯",
+      "female": true,
+      "note": "史料里: 弗兰·辛纳的女儿 (约 870 年生), 先后嫁给芒斯特、伦斯特、艾莱赫三个国王"
+     },
+     {
+      "id": "donnchad_donn",
+      "name": "唐哈德",
+      "female": false,
+      "note": "史料里: 弗兰·辛纳的儿子, 后来的至尊王「棕发」唐哈德"
+     }
+    ]
+   },
+   {
+    "father": "flann_sinna",
+    "mother": "eithne_ailech",
+    "kids": [
+     {
+      "id": "mael_ruanaid_flann",
+      "name": "梅尔·鲁阿奈德",
+      "female": false,
+      "note": "史料里: 弗兰·辛纳和埃斯尼的儿子, 901 年被杀"
+     }
+    ]
+   },
+   {
+    "father": "flann_sinna",
+    "mother": "mael_muire",
+    "kids": [
+     {
+      "id": "domnall_flann",
+      "name": "多姆纳尔",
+      "female": false,
+      "note": "史料里: 弗兰·辛纳和梅尔穆雷的儿子, 后来当了米斯国王 (919–921)"
+     },
+     {
+      "id": "ligach",
+      "name": "利加赫",
+      "female": true,
+      "note": "史料里: 弗兰·辛纳和梅尔穆雷的女儿 (923 年死)"
+     }
+    ]
+   },
+   {
+    "father": "flann_sinna",
+    "kids": [
+     {
+      "id": "oengus_flann",
+      "name": "奥恩古斯",
+      "female": false,
+      "note": "史料里: 弗兰·辛纳的儿子 (915 年死), 母亲不详"
+     },
+     {
+      "id": "conchobar_flann",
+      "name": "康霍瓦尔",
+      "female": false,
+      "note": "史料里: 弗兰·辛纳的儿子, 后来当了米斯国王 (916–919), 母亲不详"
+     },
+     {
+      "id": "aed_flann",
+      "name": "艾德",
+      "female": false,
+      "note": "史料里: 弗兰·辛纳的儿子, 母亲不详"
+     },
+     {
+      "id": "cerball_flann",
+      "name": "凯尔伯尔",
+      "female": false,
+      "note": "史料里: 弗兰·辛纳的儿子, 母亲不详"
+     },
+     {
+      "id": "muirgel",
+      "name": "穆尔格尔",
+      "female": true,
+      "note": "史料里: 弗兰·辛纳的女儿 (928 年死), 母亲不详"
+     }
+    ]
+   },
+   {
+    "father": "aed_alba",
+    "kids": [
+     {
+      "id": "constantine_aed",
+      "name": "康斯坦丁",
+      "female": false,
+      "note": "史料里: 艾德的儿子, 879 年以前生, 后来的阿尔巴国王康斯坦丁二世 (900–943)"
+     }
+    ]
+   },
+   {
+    "father": "constantine_aed",
+    "kids": [
+     {
+      "id": "ildulb",
+      "name": "伊尔杜尔夫",
+      "female": false,
+      "note": "史料里: 康斯坦丁二世的儿子, 后来的阿尔巴国王 (954–962)"
+     },
+     {
+      "id": "cellach_constantine",
+      "name": "凯拉赫",
+      "female": false,
+      "note": "史料里: 康斯坦丁二世的儿子, 937 年死在布鲁南堡战役"
+     }
+    ]
+   },
+   {
+    "father": "domnall_alba",
+    "kids": [
+     {
+      "id": "mael_coluim",
+      "name": "梅尔·科卢姆",
+      "female": false,
+      "note": "史料里: 多姆纳尔二世的儿子, 后来的阿尔巴国王马尔科姆一世 (943–954)"
+     }
+    ]
+   },
+   {
+    "father": "anarawd",
+    "kids": [
+     {
+      "id": "idwal_foel",
+      "name": "伊德瓦尔",
+      "female": false,
+      "note": "史料里: 安纳拉乌德的儿子, 人称「秃头」伊德瓦尔, 后来的格温内斯国王"
+     }
+    ]
+   },
+   {
+    "father": "idwal_foel",
+    "kids": [
+     {
+      "id": "meurig_idwal",
+      "name": "梅里格",
+      "female": false,
+      "note": "史料里: 「秃头」伊德瓦尔的儿子"
+     },
+     {
+      "id": "iefan",
+      "name": "耶凡",
+      "female": false,
+      "note": "史料里: 「秃头」伊德瓦尔的儿子"
+     },
+     {
+      "id": "iago_idwal",
+      "name": "雅戈",
+      "female": false,
+      "note": "史料里: 「秃头」伊德瓦尔的儿子, 后来跟弟弟耶瓦夫一起当格温内斯国王"
+     },
+     {
+      "id": "cynan_idwal",
+      "name": "库南",
+      "female": false,
+      "note": "史料里: 「秃头」伊德瓦尔的儿子"
+     },
+     {
+      "id": "ieuaf",
+      "name": "耶瓦夫",
+      "female": false,
+      "note": "史料里: 「秃头」伊德瓦尔的儿子, 后来的格温内斯国王"
+     },
+     {
+      "id": "rhodri_idwal",
+      "name": "罗德里",
+      "female": false,
+      "note": "史料里: 「秃头」伊德瓦尔的儿子"
+     }
+    ]
+   },
+   {
+    "father": "cadell",
+    "kids": [
+     {
+      "id": "hywel_dda",
+      "name": "休厄尔",
+      "female": false,
+      "note": "史料里: 卡德尔的儿子 (9 世纪后期生), 后来的「好人」休厄尔, 几乎统一了威尔士, 据说编了威尔士的法典"
+     },
+     {
+      "id": "clydog",
+      "name": "克莱多格",
+      "female": false,
+      "note": "史料里: 卡德尔的儿子, 920 年死"
+     },
+     {
+      "id": "morgan_cadell",
+      "name": "摩根",
+      "female": false,
+      "note": "史料里: 卡德尔的儿子, 946 年还跟休厄尔一起去英格兰"
+     },
+     {
+      "id": "cadwgan_cadell",
+      "name": "卡德甘",
+      "female": false,
+      "note": "史料里: 卡德尔的儿子, 946 年还跟休厄尔一起去英格兰"
+     }
+    ]
+   },
+   {
+    "father": "hywel_dda",
+    "kids": [
+     {
+      "id": "owain_hywel",
+      "name": "欧温",
+      "female": false,
+      "note": "史料里: 「好人」休厄尔的儿子, 后来的德赫巴斯国王"
+     },
+     {
+      "id": "rhodri_hywel",
+      "name": "罗德里",
+      "female": false,
+      "note": "史料里: 「好人」休厄尔的儿子"
+     },
+     {
+      "id": "edwin_hywel",
+      "name": "埃德温",
+      "female": false,
+      "note": "史料里: 「好人」休厄尔的儿子"
+     },
+     {
+      "id": "angharad_hywel",
+      "name": "安加拉德",
+      "female": true,
+      "note": "史料里: 「好人」休厄尔的女儿"
+     }
+    ]
+   },
+   {
+    "father": "merfyn_ap_rhodri",
+    "kids": [
+     {
+      "id": "haearnddur",
+      "name": "海亚恩祖尔",
+      "female": false,
+      "note": "史料里: 梅尔芬的儿子, 953 年前后淹死"
+     }
+    ]
+   },
+   {
+    "father": "llywarch",
+    "kids": [
+     {
+      "id": "elen_llywarch",
+      "name": "埃伦",
+      "female": true,
+      "note": "史料里: 德费德国王利瓦尔赫的女儿, 传说嫁给了「好人」休厄尔"
+     }
+    ]
+   },
+   {
+    "father": "ruler_brycheiniog",
+    "kids": [
+     {
+      "id": "tewdwr_elisedd",
+      "name": "泰乌多尔",
+      "female": false,
+      "note": "史料里: 埃利塞德的儿子, 916 年已经当了布雷肯国王"
+     }
+    ]
+   },
+   {
+    "father": "owain_g",
+    "kids": [
+     {
+      "id": "gruffydd_owain",
+      "name": "格鲁菲兹",
+      "female": false,
+      "note": "史料里: 欧温的儿子, 跟弟弟卡德甘一起当格利维辛国王, 935 年前后被杀"
+     },
+     {
+      "id": "cadwgan_owain",
+      "name": "卡德甘",
+      "female": false,
+      "note": "史料里: 欧温的儿子, 950 年前后被撒克逊人杀了"
+     },
+     {
+      "id": "morgan_hen",
+      "name": "摩根",
+      "female": false,
+      "note": "史料里: 欧温的儿子, 后来人称「老」摩根, 把格温特和格利维辛合成一国 (974 年死)"
+     }
+    ]
+   }
+  ]
+ },
+ "vassals": [
+  {
+   "id": "aethelwulf_berkshire",
+   "name": "埃塞尔伍尔夫",
+   "born": 820,
+   "culture": "anglo_saxon",
+   "house": "berkshire_house",
+   "county": "berkshire",
+   "note": "伯克郡郡长 (史料: 860 年跟汉普郡郡长一起打退攻打温切斯特的海盗, 870 年底在英格尔菲尔德打赢维京人, 871 年在雷丁战死)。埃塞尔沃德的编年史说他是麦西亚人。生年: 825 年以前"
+  },
+  {
+   "id": "wulfhere_wiltshire",
+   "name": "伍尔夫希尔",
+   "born": 825,
+   "culture": "anglo_saxon",
+   "house": "wulfhere_house",
+   "county": "wiltshire",
+   "note": "威尔特郡郡长 (史料: 大约 855–877 年在任)。878 年维京人偷袭奇彭纳姆时他失职, 后来被阿尔弗雷德以「背弃国王和国家」没收了土地。有史学家猜他是王后伍尔夫思里斯的哥哥 (没有定论, 游戏里没连上)。生年估计"
+  },
+  {
+   "id": "aethelred_mucel",
+   "name": "埃塞尔雷德·穆赫尔",
+   "born": 810,
+   "culture": "anglo_saxon",
+   "house": "gaini",
+   "county": "lincoln",
+   "note": "盖尼人的郡长, 埃尔斯维斯的父亲 (阿瑟)。836–866 年麦西亚的文书上有个郡长「穆赫尔」, 可能就是他。盖尼人大概在林肯郡的盖恩斯伯勒一带, 所以放在林肯 (位置是猜的)。生年估计"
+  },
+  {
+   "id": "flann_mac_conaing",
+   "name": "弗兰·麦克·科奈英",
+   "born": 820,
+   "culture": "gaelic",
+   "house": "brega",
+   "county": "brega",
+   "note": "布雷加国王 (年鉴: 868 年在基利尼尔战死, 打他的是至尊王艾德·芬德利亚斯)。布雷加的格尔姆莱斯的父亲。生年估计"
+  },
+  {
+   "id": "congalach_airgialla",
+   "name": "康加拉赫·麦克·芬纳赫塔",
+   "born": 825,
+   "culture": "gaelic",
+   "house": "airgialla",
+   "county": "airgialla",
+   "note": "艾尔吉亚拉国王 (年鉴只记他 874 年去世; 前一个国王 850 年前后死, 所以 867 年多半是他)。生年估计"
+  },
+  {
+   "id": "donnacan_ferns",
+   "name": "唐纳坎·麦克·凯特法达",
+   "born": 830,
+   "culture": "gaelic",
+   "house": "ui_chennselaig",
+   "county": "ferns",
+   "note": "乌伊亨塞拉格国王 (年鉴只记他 869 年去世; 前一个国王 865 年死, 所以 867 年多半是他)。生年估计"
+  },
+  {
+   "id": "mael_sinchill",
+   "name": "梅尔·辛希尔·麦克·穆格龙",
+   "born": 830,
+   "culture": "gaelic",
+   "house": "ui_failge",
+   "county": "ui_failge",
+   "note": "乌伊法尔吉国王 (年鉴只记他 881 年去世; 前一个国王 849 年死, 所以 867 年多半是他)。生年估计"
   }
  ]
 }

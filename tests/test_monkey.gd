@@ -25,11 +25,11 @@ func test_random_play() -> void:
 	var last_day := clock.day
 	for i in STEPS:
 		var p := Vector2(rng.randf_range(0, 1920), rng.randf_range(0, 1080))
-		match rng.randi_range(0, 7):
+		match rng.randi_range(0, 9):
 			0, 1:
 				_click_map(map, p)
 			2:
-				var all: Array = hud._spots + hud._county_spots + hud._person_spots + hud._popup_spots
+				var all: Array = hud._spots + hud._county_spots + hud._person_spots + hud._window_spots + hud._popup_spots
 				all.reverse()
 				for s in all:
 					if s.visible and Rect2(s.position, s.size).has_point(p):
@@ -59,6 +59,28 @@ func test_random_play() -> void:
 				main._process(rng.randf_range(0.0, 0.5))
 				map._process(0.016)
 				hud._process(0.016)
+			9:
+				# 打开你的国家, 或者对你国家里随便一个人「互动」 (第 5 块)
+				if hud.player_id != "" and hud.popup.is_empty():
+					if rng.randf() < 0.4:
+						hud._open_realm_window()
+					else:
+						var them: Array = main.world.living.values().filter(func(x: Person) -> bool: return main.world.home_realm(x) == hud.player)
+						if not them.is_empty():
+							hud.show_person(them[rng.randi_range(0, them.size() - 1)].id)
+							if not hud._actions_for(main.world.people[hud.person_id]).is_empty():
+								hud._open_actions()
+			8:
+				# 打开你家族里随便一个人的人物窗口 (这样乱点才点得到说亲、教育、起名这些)
+				if hud.player != "" and hud.popup.is_empty():
+					var mine: Array = main.world.living.values().filter(func(x: Person) -> bool: return main.world.is_player_family(x))
+					if not mine.is_empty():
+						hud.show_person(mine[rng.randi_range(0, mine.size() - 1)].id)
+						if rng.randf() < 0.5:
+							for b in hud._person_buttons(main.world.people[hud.person_id]):
+								if rng.randf() < 0.5:
+									b[2].call()
+									break
 		check(clock.day >= last_day, "日期只往前走")
 		last_day = clock.day
 		check(clock.speed >= 1 and clock.speed <= Clock.MAX_SPEED, "速度在一到五档")
@@ -66,6 +88,9 @@ func test_random_play() -> void:
 		check(hud.county == 0 or not main.world.county_at(hud.county).is_empty(), "左边窗口开着的是一块真的领地")
 		check(hud.player == "" or main.world.realms.has(hud.player), "玩家的国家是真的")
 		check(hud.player != "" or clock.paused, "没选国王时间不走")
+		check(main.world.player == hud.player_id or clock.paused, "世界知道玩家是谁")
+		check(hud.window.is_empty() or hud.window.kind in ["realm", "grant"] or hud.person_id == hud.window.person, "说亲、教育、互动的窗口跟着人物窗口")
+		check(hud.player_id == "" or main.world.is_landed(main.world.people[hud.player_id]) or not hud.popup.is_empty(), "玩家有领地 (不然游戏结束)")
 		if not failures.is_empty():
 			failures.append("第 %d 步出的错" % i)
 			return

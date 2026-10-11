@@ -97,6 +97,66 @@ func _run() -> void:
 	w.kill(w.ruler("wessex"), main.clock.day, events)
 	main.handle_events(events)
 	await _shot("14_你的国王去世")
+
+	# 第 4 块: 说亲窗口、教育窗口、生孩子起名、人物窗口里的配偶怀孕同盟、小时候的性格
+	hud.close_popup()
+	var alfred: Person = w.people["alfred"]
+	hud.show_person("alfred")
+	await _shot("15_人物窗口_阿尔弗雷德")
+	hud._open_match()
+	await _shot("16_说亲窗口")
+	hud.close_window()
+	var kid: Person = w.people["aethelhelm"]
+	kid.birth_day = main.clock.day - 7 * 365
+	w._grow(kid, main.clock.day, [])
+	hud.show_person("aethelhelm")
+	hud._open_teacher()
+	await _shot("17_教育窗口")
+	hud.close_window()
+	main.close_panel()
+	w.marry(alfred, w.people["ealhswith"], main.clock.day, [])
+	var ev := []
+	w.people["ealhswith"].pregnant = {"father": "alfred", "due": main.clock.day}
+	w._give_birth(w.people["ealhswith"], main.clock.day, ev)
+	main.handle_events(ev)
+	await _shot("18_生孩子起名")
+	hud.name_edit.text = "阿特尔斯坦"
+	hud.name_edit.caret_column = 5
+	await _shot("18b_自己起名")
+	hud.close_popup()
+	w.people["ealhswith"].pregnant = {"father": "alfred", "due": main.clock.day + 200}
+	hud.show_person("ealhswith")
+	await _shot("19_人物窗口_怀孕")
+	hud.show_person(w.realms.ailech.ruler_id)
+	await _shot("20_人物窗口_艾德")
+	main.close_panel()
+	var sheet2 := TraitSheet.new()
+	hud.add_child(sheet2)
+	await _shot("21_特点图标")
+
+	# 第 5 块: 封臣
+	sheet2.queue_free()
+	map.show_all()
+	main.close_panel()
+	hud._open_realm_window()
+	await _shot("22_我的国家")
+	var rows: Array = hud.window.rows
+	for i in rows.size():
+		if rows[i].type == "county" and not rows[i].capital:
+			hud._choose_row(i)
+			break
+	await _shot("23_封地")
+	hud.close_window()
+	hud.me().gold = 60
+	hud.show_person("wulfhere_wiltshire")
+	await _shot("24_人物窗口_郡长")
+	hud._open_actions()
+	await _shot("25_互动")
+	hud.close_window()
+	main.close_panel()
+	map.focus(w.by_id.berkshire.seat, 1.6)
+	main._on_county_clicked(w.by_id.berkshire.index)
+	await _shot("26_领地窗口_伯克郡")
 	quit()
 
 
@@ -112,7 +172,7 @@ class IconSheet:
 	func _draw() -> void:
 		draw_rect(Rect2(0, 0, 1920, 1080), Color(0.07, 0.075, 0.09))
 		for i in Icons.NAMES.size():
-			var c := Vector2(90 + (i % 12) * 150, 110 + (i / 12) * 170)
+			var c := Vector2(90 + (i % 13) * 142, 110 + (i / 13) * 170)
 			draw_rect(Rect2(c - Vector2(60, 60), Vector2(120, 120)), Color(0.12, 0.125, 0.14))
 			Icons.draw(self, Icons.NAMES[i], c, 100, Look.GOLD)
 			Icons.draw(self, Icons.NAMES[i], c + Vector2(48, 48), 28, Look.GOLD)
@@ -137,6 +197,8 @@ class TraitSheet:
 		for t in Traits.data().personality:
 			items.append([t.id, t.name])
 		for t in Traits.data().congenital:
+			items.append([t.id, t.name])
+		for t in Traits.data().childhood:
 			items.append([t.id, t.name])
 		for tr in Traits.data().education.tracks:
 			for lv in [1, 4]:
