@@ -3,22 +3,28 @@ extends Node2D
 ## 地图: 领地图按国家 (或公国、王国、帝国、家族) 上色, 能拖、能缩放、点一下选中一块领地。
 ## 第 5 块 (学三代): 同一个国家里不同主人的地之间画细线, 每个主人的地上画他的纹章 (国王加小王冠);
 ## 选中一个人 (人物窗口、领地窗口) 时, 他直辖的地亮起来, 他的封臣照常, 别的地方暗下去。
+## 第 6 块: 被占领的地画斜条纹 (占领一方的颜色); 地图上画军队 (小旗子, 写着人数)、打仗 (交叉的剑)、围城 (塔和进度);
+## 点自己的军队选中它, 再右键点一块地让它走过去。
 ## 地图上的坐标就是领地图的像素坐标 (一个像素 0.5 公里)。
 
 signal county_clicked(index: int)   # 0 = 点在海上
 signal county_hovered(index: int)
+signal county_right_clicked(index: int)   # 右键点 (选中了军队时: 走过去)
+signal army_clicked(id: int)
 
 enum Mode { REALM, DUCHY, KINGDOM, EMPIRE, HOUSE }
 const MODE_NAMES := ["国家", "公国", "王国", "帝国", "家族"]
 const SHIELD_ZOOM := 0.55      # 放大到这么大才画纹章 (再远只看国家, 跟三代的「纸地图」一样)
 const SHIELD_PX := 30.0        # 纹章在屏幕上多大
-const KINGDOM_COLORS := {"england": "a8433a", "scotland": "3d6299", "wales": "418a4b", "ireland": "c4a24c"}
+const KINGDOM_COLORS := {"england": "a8433a", "scotland": "3d6299", "wales": "418a4b", "ireland": "c4a24c",
+		"danelaw": "5a5f6b", "k_isles": "2f7f86", "k_cumbria": "7a5d9c"}   # 后三个是特别决议建立的王国 (第 8 块)
 const EMPIRE_COLOR := Color("7b5a8f")
 const ZOOM_MIN := 0.36
 const ZOOM_MAX := 4.0
 const KEY_PAN_SPEED := 900.0  # 每秒多少屏幕像素
 const CLICK_SLOP := 6.0       # 按下去动了这么多像素以内算「点」, 再多就算「拖」
 const SEA_PAD := 3000.0       # 领地图外面再铺这么宽的海 (缩到最小也看不到边)
+const ARMY_PX := Vector2(58, 24)  # 军队的小牌子在屏幕上多大 (上面再插一面小旗)
 
 var world: World
 var pmap: ProvinceMap
@@ -26,6 +32,8 @@ var mode := Mode.REALM
 var hovered := 0
 var selected := 0
 var focus_person := ""         # 选中的人 (他的地亮起来); 空 = 没选
+var selected_army := -1        # 选中的军队 (自己的), -1 = 没选
+var hovered_army := -1
 var camera := Camera2D.new()
 var overlay := MapOverlay.new()
 
@@ -58,7 +66,7 @@ func _ready() -> void:
 	add_child(overlay)
 	add_child(camera)
 	camera.make_current()
-	_lookup = Image.create(world.counties.size() + 1, 3, false, Image.FORMAT_RGBA8)
+	_lookup = Image.create(world.counties.size() + 1, 4, false, Image.FORMAT_RGBA8)
 	_lookup_tex = ImageTexture.create_from_image(_lookup)
 	_material.set_shader_parameter("lookup", _lookup_tex)
 	_material.set_shader_parameter("provinces", pmap.texture)
@@ -174,8 +182,36 @@ func refresh_colors() -> void:
 		_lookup.set_pixel(c.index, 0, col)
 		_lookup.set_pixel(c.index, 1, Color8(group >> 8, group & 255, 0))
 		_lookup.set_pixel(c.index, 2, Color8(lord_code >> 8, lord_code & 255, 0))
+		_lookup.set_pixel(c.index, 3, occupier_color(c) if c.occupier != "" else Color(0, 0, 0, 0))
 	_lookup_tex.update(_lookup)
 	overlay.queue_redraw()
+
+
+## 占领者的颜色 (他国家的颜色; 造反的封臣用家族的颜色)
+func occupier_color(c: Dictionary) -> Color:
+	var p: Person = world.people.get(c.occupier)
+	if p == null:
+		return Color(0.2, 0.2, 0.2)
+	if p.realm != "" and world.realms.has(p.realm):
+		return (world.realms[p.realm].color as Color).darkened(0.15)
+	return house_color(p.house).darkened(0.15)
+
+
+## 军队的小牌子在屏幕上的位置 (屏幕坐标)
+func army_rect(a: Dictionary) -> Rect2:
+	var c := map_to_screen(world.warfare.army_pos(a))
+	return Rect2(c - Vector2(ARMY_PX.x / 2.0, ARMY_PX.y / 2.0 - 18.0), ARMY_PX)
+
+
+## 屏幕上这一点是哪支军队 (自己的优先), 没有是 -1
+func army_at(screen_pos: Vector2) -> int:
+	var found := -1
+	for a in world.warfare.armies.values():
+		if army_rect(a).grow(4).has_point(screen_pos):
+			if a.owner == world.player:
+				return a.id
+			found = a.id
+	return found
 
 
 ## 屏幕上一点 (1920×1080 的画面坐标) 在地图上是哪里
@@ -219,7 +255,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			else:
 				_dragging = false
 				if mb.button_index == MOUSE_BUTTON_LEFT and _drag_moved < CLICK_SLOP:
-					county_clicked.emit(pmap.index_at(screen_to_map(mb.position)))
+					var aid := army_at(mb.position)
+					if aid >= 0:
+						army_clicked.emit(aid)
+					else:
+						county_clicked.emit(pmap.index_at(screen_to_map(mb.position)))
+				elif mb.button_index == MOUSE_BUTTON_RIGHT and _drag_moved < CLICK_SLOP:
+					county_right_clicked.emit(pmap.index_at(screen_to_map(mb.position)))
 			get_viewport().set_input_as_handled()
 	elif event is InputEventMouseMotion:
 		var mm := event as InputEventMouseMotion
@@ -246,6 +288,10 @@ func _zoom_at(screen_pos: Vector2, z: float) -> void:
 
 
 func _update_hover(screen_pos: Vector2) -> void:
+	var ha := army_at(screen_pos)
+	if ha != hovered_army:
+		hovered_army = ha
+		overlay.queue_redraw()
 	var i := pmap.index_at(screen_to_map(screen_pos))
 	if i != hovered:
 		hovered = i
@@ -294,6 +340,7 @@ class MapOverlay:
 		if z >= MapView.SHIELD_ZOOM and view.mode in [MapView.Mode.REALM, MapView.Mode.HOUSE]:
 			for sh in shields():
 				_shield(sh, z)
+		_war_marks(z)
 		if z < 1.35:
 			var alpha := clampf((1.35 - z) / 0.35, 0.0, 1.0)
 			for g in _groups():
@@ -302,6 +349,75 @@ class MapOverlay:
 				if size * z < 9.0:
 					continue
 				_label(font, g.pos + Vector2(0, size * 0.35), g.text, int(size), size * 0.08, alpha)
+
+	## 打仗的东西: 围城 (塔和进度条)、打仗 (交叉的剑)、军队 (小旗子和人数; 选中的军队画出要走的路)
+	func _war_marks(z: float) -> void:
+		var w := view.world
+		var wf := w.warfare
+		var k := 1.0 / z
+		for loc in wf.sieges:
+			var c: Dictionary = w.by_id[loc]
+			var s: Dictionary = wf.sieges[loc]
+			var p: Vector2 = c.seat + Vector2(-50, 8) * k  # 军队牌子的左边
+			draw_circle(p, 16 * k, Color(0.1, 0.1, 0.1, 0.8))
+			Icons.draw(self, "tower", p, 24 * k, Color("e0d0a0"))
+			var bar := Rect2(p + Vector2(-20, 18) * k, Vector2(40, 6) * k)
+			draw_rect(bar, Color(0.1, 0.1, 0.1, 0.9))
+			draw_rect(Rect2(bar.position, Vector2(bar.size.x * clampf(s.progress / wf.siege_needed(c), 0.0, 1.0), bar.size.y)), Color("d9b44a"))
+		for b in wf.battles.values():
+			var c: Dictionary = w.by_id[b.loc]
+			draw_circle(c.seat - Vector2(0, 46) * k, 17 * k, Color(0.5, 0.1, 0.08, 0.9))
+			Icons.draw(self, "swords", c.seat - Vector2(0, 46) * k, 26 * k, Color("f0e0c0"))
+		var sel: Dictionary = wf.armies.get(view.selected_army, {})
+		if not sel.is_empty() and not sel.path.is_empty():
+			var pts := PackedVector2Array([wf.army_pos(sel)])
+			for e in sel.path:
+				pts.append(w.by_id[e[0]].seat)
+			for i in pts.size() - 1:
+				_dashed(pts[i], pts[i + 1], Color(0.95, 0.85, 0.4, 0.95), 3.0 * k, 10.0 * k)
+			draw_circle(pts[pts.size() - 1], 6 * k, Color(0.95, 0.85, 0.4, 0.95))
+		for a in wf.armies.values():
+			_army(a, z)
+
+	func _dashed(a: Vector2, b: Vector2, col: Color, width: float, dash: float) -> void:
+		var d := a.distance_to(b)
+		var n := maxi(1, int(d / dash))
+		for i in range(0, n, 2):
+			draw_line(a.lerp(b, float(i) / n), a.lerp(b, minf(1.0, float(i + 1) / n)), col, width)
+
+	## 一支军队: 一面小旗 (国家的颜色) 插在写着人数的牌子上; 自己的金边, 跟你打仗的红边, 选中的亮
+	func _army(a: Dictionary, z: float) -> void:
+		var w := view.world
+		var wf := w.warfare
+		var k := 1.0 / z
+		var owner: Person = w.people[a.owner]
+		var r := view.army_rect(a)
+		var size := r.size * k
+		var rect := Rect2(view.screen_to_map(r.position), size)
+		var col: Color = w.realms[owner.realm].color if owner.realm != "" and w.realms.has(owner.realm) else view.house_color(owner.house)
+		var edge := Color(0.1, 0.08, 0.06)
+		if a.owner == w.player:
+			edge = Icons.GOLD
+		elif w.player != "" and wf.hostile(a.owner, w.player):
+			edge = Color("e04a3a")
+		var lit: bool = view.selected_army == a.id or view.hovered_army == a.id
+		# 旗杆和旗子
+		var pole := rect.position + Vector2(size.x * 0.18, 0)
+		draw_line(pole, pole - Vector2(0, 28 * k), Color(0.12, 0.09, 0.06), 3.0 * k)
+		var flag := PackedVector2Array([pole - Vector2(0, 28 * k), pole + Vector2(20 * k, -22 * k), pole - Vector2(0, 15 * k)])
+		draw_colored_polygon(flag, col)
+		flag.append(flag[0])
+		draw_polyline(flag, Color(0.95, 0.9, 0.75), 1.5 * k)
+		draw_rect(rect, Color(0.08, 0.08, 0.09, 0.92))
+		draw_rect(Rect2(rect.position, Vector2(6 * k, size.y)), col)
+		draw_rect(rect, edge.lightened(0.3) if lit else edge, false, (3.0 if lit else 2.0) * k)
+		var font := Look.font("sans")
+		var t := str(int(wf.soldiers(a)))
+		var fs := maxi(1, int(15 * k))
+		var tw := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		draw_string(font, rect.position + Vector2(size.x / 2.0 - tw / 2.0 + 3 * k, size.y * 0.72), t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0.95, 0.92, 0.85))
+		if int(a.retreat) > 0 or int(a.gather) > 0:
+			draw_rect(rect, Color(0.05, 0.05, 0.05, 0.35))
 
 	## 每个有领地的人一个纹章, 放在他直辖的地中间: [{person, pos, king}]
 	func shields() -> Array:

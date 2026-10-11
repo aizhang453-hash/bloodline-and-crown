@@ -150,7 +150,7 @@ func test_monthly_prestige_and_coming_of_age() -> void:
 		eq(kid.personality().size(), 3, "满 16 岁有了 3 个性格")
 		check(not kid.education.is_empty(), "教育也定了")
 	if p.alive:
-		eq(p.prestige, 1.0, "国王一个月涨 1 点威望")
+		eq(p.prestige, War.START_PRESTIGE_KING + 1.0, "国王开局 100 威望, 一个月涨 1 点")
 
 
 func test_long_run_stays_consistent() -> void:

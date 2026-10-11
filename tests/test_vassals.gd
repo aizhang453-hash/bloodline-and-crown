@@ -357,9 +357,10 @@ func test_long_run_feudal_consistency() -> void:
 				var l: Person = w.people[c.lord]
 				check(l.alive, "%s 的主人活着" % c.name)
 				check(w.realm_of_person(l) == c.holder, "%s 的主人属于这个国家 (%s)" % [c.name, l.name])
-				check(l.prisoner_of == "" or l.realm == "", "国王不在大牢里")
+				# 第 6 块起国王打仗会被别国抓, 但不会关在自己国家的大牢里
+				check(l.prisoner_of == "" or l.realm == "" or w.realm_of_person(w.people[l.prisoner_of]) != l.realm, "国王不在自己国家的大牢里")
 			for p in w.living.values():
-				check(p.gold >= 0.0, "钱不是负数")
+				check(not is_nan(p.gold), "钱是个数")  # 第 6 块起养兵、打输了赔钱会欠钱 (照三代)
 				check(p.tyranny >= 0.0)
 		if not failures.is_empty():
 			failures.append("第 %d 个月" % m)

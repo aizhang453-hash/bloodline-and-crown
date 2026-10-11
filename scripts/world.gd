@@ -7,6 +7,8 @@ extends RefCounted
 ## 电脑给国王家的人说亲, 史料里的婚事照着安排 (data 的 history), 史料里有名字的孩子用真名。结婚的规矩见 Marriage。
 ## 第 5 块: 每块领地有个主人 (lord): 国王自己管的是直辖领地, 别的是封臣 (郡长、小国王、雅尔、领主、副王) 的; 每月收钱,
 ## 封臣按合同给上面交钱交兵; 封地、收回、关大牢、送礼、改合同。规矩见 Feudal。
+## 第 6 块: 打仗 (军队、打仗、围城、战争) 在 warfare (Warfare), 规矩见 War; 每天走一次。领地被占领 (occupier) 时不出钱不出兵。
+## 第 7 块: 阴谋 (暗杀、拉拢、秘密、把柄) 在 intrigue (Intrigue), 规矩见 Schemes; 每天走一次。
 
 const WORLD_FILE := "res://data/world_867.json"
 const MAP_FILE := "res://data/generated/map.json"
@@ -26,6 +28,12 @@ var kids_of := {}        # 父母的 id -> [孩子的 id, ...] (按出生先后)
 var ancestor_cache := {} # 人的 id -> 祖先 (Marriage.ancestors 算好存这里, 祖先不会变)
 var history_marriages: Array = []  # 史料里开局以后的婚事 [{a, b, year, note}]
 var history_children: Array = []   # 史料里开局以后出生的孩子 [{father, mother?, kids: [{id, name, female, note}]}]
+var history_wars: Array = []       # 史料里开局以后的仗 [{year, month, attacker, defender, cb, target, note}] (第 6 块)
+var history_reinforcements: Array = []  # 史料里维京人的援兵 [{year, month, realm, special, note}] (871 年的夏季大军)
+var warfare: Warfare               # 打仗 (第 6 块)
+var intrigue: Intrigue             # 阴谋 (第 7 块)
+var story: StoryEvents             # 随机事件和压力崩溃 (第 8 块)
+var history_schemes: Array = []    # 史料里的阴谋 [{year, month, schemer, target, kind, note}] (872 年阿特加尔被杀)
 var rules := Rules.defaults()  # 开局设置 (照三代的游戏规则; 开局前选好)
 var generated_by := {}         # 开局生成的家人: 一家之主的 id -> [妻子、孩子的 id] (「只给电脑」时玩家选的人要拿掉)
 var player := ""         # 玩家这个人的 id (电脑不替玩家家里的人说亲, 不收回玩家的地); main 每一帧同步
@@ -81,6 +89,8 @@ func _load(data: Dictionary, map: Dictionary, p_names: Dictionary, name_seed: in
 	empire = data.empire
 	for k in data.kingdoms:
 		kingdoms[k.id] = k
+	for k in data.get("titular_kingdoms", []):
+		kingdoms[k.id] = k  # 特别决议才建立的王国 (第 8 块)
 	for du in data.duchies:
 		duchies[du.id] = du
 	var setup := RandomNumberGenerator.new()
@@ -130,7 +140,11 @@ func _load(data: Dictionary, map: Dictionary, p_names: Dictionary, name_seed: in
 		realm.house = ruler.house
 		houses[ruler.house].color = realm.color  # 统治家族的纹章跟国家一样
 		houses[ruler.house].design = realm.index
+		ruler.prestige = War.START_PRESTIGE_KING
 		_register(ruler)
+		realm.special = int(r.get("special_troops", 0))  # 不用养、死了不补的兵 (维京大军)
+		if realm.titles.is_empty() and duchies.has(r.id):
+			realm.titles = [r.id]  # 自己那个公国 (法理宣战要用)
 		realm.ruler = ruler.name
 		realm.ruler_id = ruler.id
 		realms[r.id] = realm
@@ -141,6 +155,9 @@ func _load(data: Dictionary, map: Dictionary, p_names: Dictionary, name_seed: in
 	var history: Dictionary = data.get("history", {}) if rules.history == "on" else {}
 	history_marriages = history.get("marriages", [])
 	history_children = history.get("children", [])
+	history_wars = data.get("history", {}).get("wars", []) if rules.get("wars", "on") == "on" else []
+	history_reinforcements = data.get("history", {}).get("reinforcements", []) if rules.get("wars", "on") == "on" else []
+	history_schemes = data.get("history", {}).get("schemes", []) if rules.get("wars", "on") == "on" else []
 	_setup_children(setup)
 
 	map_size = Vector2i(int(map.width), int(map.height))
@@ -158,6 +175,7 @@ func _load(data: Dictionary, map: Dictionary, p_names: Dictionary, name_seed: in
 			"seat": Vector2(s.seat[0], s.seat[1]), "center": Vector2(s.center[0], s.center[1]),
 			"area_km2": int(s.area_km2), "rect": Rect2i(rect[0], rect[1], rect[2], rect[3]),
 			"neighbors": s.neighbors, "coastal": s.coastal,
+			"occupier": "", "garrison": 0.0, "fort_bonus": int(data.get("forts", {}).get(c.id, 0)),
 		})
 		by_id[c.id] = counties[i]
 	for ring in map.coastline:
@@ -170,6 +188,16 @@ func _load(data: Dictionary, map: Dictionary, p_names: Dictionary, name_seed: in
 	_setup_vassals(setup, data.get("vassals", []))
 	_link_spouses()  # 封臣在家人后面读, 家人里有封臣的妻子 (埃德伯)
 	_generate_families(setup)
+	for p in living.values():
+		if p.realm == "" and is_landed(p):
+			p.prestige = War.START_PRESTIGE_VASSAL
+	warfare = Warfare.new(self)
+	warfare.build_graph()
+	intrigue = Intrigue.new(self)
+	story = StoryEvents.new(self)
+	for c in counties:
+		c.garrison = warfare.max_garrison(c)
+	warfare.monthly_history_only(start_day)  # 开局就在打的仗 (867 年 1 月)
 
 
 # ---- 存档 (照三代: 随时能存、能读, 每年自动存一次) ----
@@ -193,8 +221,9 @@ func to_save() -> Dictionary:
 		hs[hid] = h
 	var cs := []
 	for c in counties:
-		cs.append([c.holder, c.lord])
-	return {"name_seed": name_seed, "today": today, "player": player, "rules": rules,
+		cs.append([c.holder, c.lord, c.occupier, c.garrison])
+	return {"name_seed": name_seed, "today": today, "player": player, "rules": rules, "warfare": warfare.to_save(), "intrigue": intrigue.to_save(),
+			"dejure": dejure_changes, "story": story.to_save(),
 			"next_index": _next_index, "next_id": _next_id, "rng_seed": str(rng.seed), "rng_state": str(rng.state),
 			"realm_order": realm_order, "realms": rs, "houses": hs, "counties": cs, "people": ps}
 
@@ -223,8 +252,11 @@ static func from_save(s: Dictionary) -> World:
 		h.design = int(h.design)
 		w.houses[hid] = h
 	for i in w.counties.size():
-		w.counties[i].holder = s.counties[i][0]
-		w.counties[i].lord = s.counties[i][1]
+		var cs: Array = s.counties[i]
+		w.counties[i].holder = cs[0]
+		w.counties[i].lord = cs[1]
+		w.counties[i].occupier = cs[2] if cs.size() > 2 else ""
+		w.counties[i].garrison = float(cs[3]) if cs.size() > 3 else w.warfare.max_garrison(w.counties[i])
 	w.today = int(s.today)
 	w.player = s.player
 	w.generated_by = {}
@@ -235,6 +267,11 @@ static func from_save(s: Dictionary) -> World:
 	w._kin_dirty = true
 	w._house_dirty = true
 	w._feudal_dirty = true
+	w.warfare.from_save(s.get("warfare", {}))
+	w.intrigue.from_save(s.get("intrigue", {}))
+	for d in s.get("dejure", {}):
+		w._set_dejure(d, s.dejure[d])
+	w.story.from_save(s.get("story", {}))
 	return w
 
 
@@ -251,6 +288,9 @@ func _add_family(setup: RandomNumberGenerator, f: Dictionary) -> void:
 	p.spouse = f.get("spouse", "")
 	p.former_spouses = f.get("former_spouses", []).duplicate()
 	p.note = f.get("note", "")
+	p.liege_realm = f.get("court", "")  # 住在哪个国王那里 (没领地; 奥斯伯特)
+	for c in f.get("claims", []):
+		p.claims.append("realm:" + c)
 	p.birth_estimated = true
 	p.birth_day = GameDate.to_day(int(f.born), 1, 1) + setup.randi_range(0, GameDate.YEAR_DAYS - 1)
 	if f.has("died"):
@@ -475,7 +515,7 @@ func ruler_text(realm_id: String) -> String:
 func realm_name(realm_id: String) -> String:
 	var t: String = realms[realm_id].title
 	t = t.split("、")[t.split("、").size() - 1]
-	for tail in ["国王", "首领", "领主", "之王"]:
+	for tail in ["至尊王", "国王", "首领", "领主", "之王", "皇帝"]:
 		if t.ends_with(tail):
 			return t.substr(0, t.length() - tail.length())
 	return t
@@ -554,10 +594,17 @@ func advance(days: int, now: int) -> Array:
 	var events := []
 	for p in living.values():
 		p.pass_days(days)
-	var from := _month_index(now - days)
-	for m in range(from + 1, _month_index(now) + 1):
-		_monthly(m, events)
+	var month := _month_index(now - days)
+	for d in range(now - days + 1, now + 1):
+		var m := _month_index(d)
+		if m != month:
+			month = m
+			_monthly(m, events)
+		today = d
+		warfare.daily(d, events)  # 打仗每天走 (行军、打仗、围城)
+		intrigue.daily(d, events)  # 阴谋每天攒机会
 	today = now
+	story.watch(events)
 	return events
 
 
@@ -574,6 +621,10 @@ func _monthly(month: int, events: Array) -> void:
 			continue
 		if not p.memories.is_empty():
 			p.memories = p.memories.filter(func(m: Dictionary) -> bool: return int(m.until) > day)
+		if not p.conditions.is_empty():
+			p.conditions = p.conditions.filter(func(c: Dictionary) -> bool: return int(c.until) > day)
+		if not p.boons.is_empty():
+			p.boons = p.boons.filter(func(c: Dictionary) -> bool: return int(c.until) > day)
 		if p.tyranny > 0.0:
 			p.tyranny = maxf(0.0, p.tyranny - Feudal.TYRANNY_DECAY)
 		if p.prisoner_of != "" and rng.randf() < Feudal.escape_chance(p, day):
@@ -585,7 +636,7 @@ func _monthly(month: int, events: Array) -> void:
 		elif p.education.is_empty() and p.personality().is_empty():
 			_come_of_age(p, day, events)
 		if p.realm != "":
-			p.prestige += 1.0
+			p.prestige += 1.0 + 0.5 * rank_bonus(p)  # 大国王、皇帝多涨一些 (第 8 块)
 		if not p.pregnant.is_empty() and day >= int(p.pregnant.due):
 			_give_birth(p, day, events)
 		var monthly := 1.0 - pow(1.0 - p.yearly_death_chance(day), 1.0 / 12.0)
@@ -599,6 +650,10 @@ func _monthly(month: int, events: Array) -> void:
 		_ai_marriages(day, events)  # 三个月算一次 (每次机会是一个月的三倍, 平均一样)
 	_economy()
 	_ai_grants(day, events)
+	warfare.monthly(day, events)
+	intrigue.monthly(day, events)
+	Decisions.ai_monthly(self, day, events)
+	story.monthly(day, events)
 
 
 ## 一个人死了 (国王死了就照继承法换人)。cause: 怎么死的 (空 = 生病老死这些)
@@ -622,12 +677,68 @@ func kill(p: Person, day: int, events: Array, cause := "") -> void:
 	if p.prisoner_of != "":
 		p.prisoner_of = ""
 	events.append({"type": "death", "person": p.id, "day": day, "was_ruler": p.realm != "", "cause": cause})
+	var was_realm := p.realm
+	var lands := lands_of(p)
 	if p.realm != "":
 		_succeed(p.realm, p, day, events)
 	elif is_landed(p):
 		_hand_down(p, day, events)
 	else:
 		_move_prisoners(p, null)
+	# 接他班的人 (国王: 国家的新国王; 封臣: 他第一块地的新主人)
+	var heir: Person = null
+	if was_realm != "":
+		if realms.has(was_realm):
+			heir = ruler(was_realm)
+		elif not lands.is_empty() and people.has(lands[0].lord):
+			heir = people[lands[0].lord]
+	elif not lands.is_empty() and lands[0].lord != p.id and people.has(lands[0].lord):
+		heir = people[lands[0].lord]
+	if heir == p:
+		heir = null
+	# 照三代: 没接上班的子女 (不分男女) 对父母的国家 (封臣是领地) 有宣称; 父母自己的宣称传给子女 (弱一档, 不再往下传)
+	var titles := []
+	if was_realm != "" and realms.has(was_realm):
+		titles.append("realm:" + was_realm)
+	elif was_realm == "":
+		for c in lands:
+			titles.append("county:" + c.id)
+	for child in children_of(p):
+		if not child.alive:
+			continue
+		for t: String in titles:
+			var holder: String = ruler(t.substr(6)).id if t.begins_with("realm:") and realms.has(t.substr(6)) else (by_id[t.substr(7)].lord if t.begins_with("county:") else "")
+			if child.id != holder and not child.claims.has(t):
+				child.claims.append(t)
+		for t in p.claims:
+			if not child.claims.has(t) and not child.weak_claims.has(t):
+				child.weak_claims.append(t)
+	_grieve(p)
+	warfare.on_death(p, heir, day, events)
+	intrigue.on_death(p)
+
+
+const GRIEF_CHILD := 40.0   # 孩子死了, 父母压力涨多少 (第 8 块; 三代也有亲人去世涨压力, 数字是我们定的)
+const GRIEF_SPOUSE := 30.0
+const GRIEF_PARENT := 15.0  # 父母死了, 成年的子女
+
+
+## 家里人去世, 亲人难过 (压力涨): 仁慈的多一半, 冷酷、残忍的少一半
+func _grieve(p: Person) -> void:
+	var hit := {}
+	for id in [p.father, p.mother]:
+		if id != "" and people.has(id) and people[id].alive:
+			hit[id] = GRIEF_CHILD
+	for id in [p.spouse] + p.secondary:
+		if id != "" and people.has(id) and people[id].alive:
+			hit[id] = GRIEF_SPOUSE
+	for c in children_of(p):
+		if c.alive and c.adult(today):
+			hit[c.id] = GRIEF_PARENT
+	for id in hit:
+		var q: Person = people[id]
+		var k := 1.5 if q.has_trait("compassionate") else (0.5 if q.has_trait("callous") or q.has_trait("sadistic") else 1.0)
+		q.add_stress(float(hit[id]) * k)
 
 
 func _succeed(realm_id: String, dead: Person, day: int, events: Array) -> void:
@@ -659,6 +770,7 @@ func _succeed(realm_id: String, dead: Person, day: int, events: Array) -> void:
 				p.liege_realm = target
 		realms[target].titles.append_array(realm.titles)
 		realms[target].viceroys.merge(realm.viceroys)
+		_merge_high_titles(target, realm)
 		_move_domain(dead, heir)
 		_move_prisoners(dead, heir)
 		_remove_realm(realm_id)
@@ -1049,6 +1161,8 @@ func propose(mine: Person, theirs: Person, day: int, events: Array) -> Dictionar
 	var acc := Marriage.acceptance(self, me(), mine, theirs, day)
 	if acc.total <= 0:
 		return {"ok": false, "text": "%s家不答应 (鼠标指着那一行看为什么)" % theirs.name}
+	if acc.get("hook", 0) > 0 and acc.total - int(acc.hook) <= 0:
+		intrigue.use_hook(me(), head_of(theirs), day)  # 不用把柄不答应: 用掉把柄 (强的五年后才能再用)
 	if not people.has(theirs.id):
 		if theirs.homeland == "":
 			theirs.homeland = mine.homeland  # 本地贵族家的
@@ -1281,7 +1395,7 @@ func _setup_vassals(setup: RandomNumberGenerator, known: Array) -> void:
 			continue
 		var k := ruler(rid)
 		var mine := cs.filter(func(c: Dictionary) -> bool: return c.lord == k.id)
-		var limit := Feudal.domain_limit(k, start_day)
+		var limit := Feudal.domain_limit(k, start_day, rank_bonus(k))
 		for i in range(limit, mine.size()):
 			_new_vassal_noble(setup, rid, mine[i])
 	_feudal_dirty = true
@@ -1448,8 +1562,12 @@ func income(p: Person, memo: Dictionary = {}) -> Dictionary:
 	if memo.has(p.id):
 		return memo[p.id]
 	var dom := lands_of(p)
-	var limit := Feudal.domain_limit(p, today)
-	var active := mini(dom.size(), limit)
+	var limit := Feudal.domain_limit(p, today, rank_bonus(p))
+	var held := 0  # 被敌人占领的地不出钱不出兵 (第 6 块)
+	for c in dom:
+		if c.occupier == "":
+			held += 1
+	var active := mini(held, limit)
 	var own_gold := active * Feudal.GOLD_PER_COUNTY
 	var own_levy := active * Feudal.LEVY_PER_COUNTY
 	var from_gold := 0.0
@@ -1463,9 +1581,12 @@ func income(p: Person, memo: Dictionary = {}) -> Dictionary:
 	if p.realm == "" and liege_of(p) != null:
 		paid_gold = (own_gold + from_gold) * Feudal.TAX_SHARE[p.contract]
 		paid_levy = roundi((own_levy + from_levy) * Feudal.LEVY_SHARE[p.contract])
+	var boons := 0.0  # 一阵子多收 (少收) 的钱: 集市、金匠、强盗…… (第 8 块的事件)
+	for b in p.boons:
+		boons += float(b.gold)
 	var result := {"domain": dom.size(), "limit": limit, "active": active, "own_gold": own_gold, "own_levy": own_levy,
-			"from_gold": from_gold, "from_levy": from_levy, "paid_gold": paid_gold, "paid_levy": paid_levy,
-			"gold": own_gold + from_gold - paid_gold, "levy": own_levy + from_levy - paid_levy}
+			"from_gold": from_gold, "from_levy": from_levy, "paid_gold": paid_gold, "paid_levy": paid_levy, "boons": boons,
+			"gold": own_gold + from_gold - paid_gold + boons, "levy": own_levy + from_levy - paid_levy}
 	memo[p.id] = result
 	return result
 
@@ -1558,7 +1679,7 @@ func _ai_grants(day: int, events: Array) -> void:
 		if k.id == player or rng.randf() >= 1.0 / 3.0:
 			continue
 		var dom := lands_of(k)
-		if dom.size() <= Feudal.domain_limit(k, day):
+		if dom.size() <= Feudal.domain_limit(k, day, rank_bonus(k)):
 			continue
 		var c: Dictionary = dom[dom.size() - 1]
 		if c.id == realms[rid].capital:
@@ -1642,7 +1763,10 @@ func revoke(liege: Person, target: Person, day: int, events: Array) -> Dictionar
 	if liege_of(target) != liege:
 		return {"ok": false, "text": "%s不是你的封臣" % target.name}
 	var o := target.opinion_of(liege)
-	if target.prisoner_of == "" and o.total < 0:
+	var hooked: bool = target.prisoner_of == "" and o.total < 0 and intrigue.held_by(target, liege) and intrigue.hook_ready(liege, target, day)
+	if hooked:
+		intrigue.use_hook(liege, target, day)  # 用把柄逼他交出来
+	if target.prisoner_of == "" and o.total < 0 and not hooked:
 		target.crimes["抗命"] = day + Feudal.CRIME_YEARS * GameDate.YEAR_DAYS
 		events.append({"type": "refused", "liege": liege.id, "target": target.id, "day": day})
 		return {"ok": false, "text": "%s不肯交出领地 (他对你的好感 %+d)。他这是抗命, 你现在有理由把他关起来" % [target.name, o.total]}
@@ -1671,7 +1795,13 @@ func arrest(jailer: Person, target: Person, day: int, events: Array) -> Dictiona
 	var why := arrest_problem(jailer, target)
 	if why != "":
 		return {"ok": false, "text": why}
-	if rng.randf() >= Feudal.arrest_chance(jailer, target, day):
+	var forced: bool = intrigue.held_by(target, jailer) and intrigue.hook_ready(jailer, target, day)
+	var bonus := 0.0
+	if not forced and intrigue.hook_ready(jailer, target, day):
+		bonus = Schemes.HOOK_ARREST_WEAK
+	if forced or bonus > 0.0:
+		intrigue.use_hook(jailer, target, day)
+	if not forced and rng.randf() >= Feudal.arrest_chance(jailer, target, day) + bonus:
 		target.remember(jailer.id, "想抓我", -40, day + 10 * GameDate.YEAR_DAYS)
 		events.append({"type": "arrest_failed", "jailer": jailer.id, "target": target.id, "day": day})
 		return {"ok": false, "text": "没抓到%s! 他知道你想抓他, 很恨你" % target.name}
@@ -1690,6 +1820,8 @@ func arrest(jailer: Person, target: Person, day: int, events: Array) -> Dictiona
 func arrest_problem(jailer: Person, target: Person) -> String:
 	if target == jailer:
 		return "不能抓自己"
+	if intrigue.held_by(jailer, target):
+		return "%s攥着你的把柄, 关不了他" % target.name
 	if not target.alive:
 		return "人已经去世了"
 	if target.prisoner_of != "":
@@ -1726,11 +1858,26 @@ func ransom(jailer: Person, prisoner: Person, day: int) -> Dictionary:
 func execute(jailer: Person, prisoner: Person, day: int, events: Array) -> Dictionary:
 	if not Feudal.has_crime(prisoner, day):
 		jailer.tyranny += Feudal.TYRANNY_EXECUTE
+	jailer.add_stress(execute_stress(jailer, prisoner, day))
 	for f in _close_family(prisoner):
 		f.remember(jailer.id, "处死了我的家人", -50, day + 30 * GameDate.YEAR_DAYS)
 	var name := prisoner.name
 	kill(prisoner, day, events, "被处死了")
 	return {"ok": true, "text": "处死了%s" % name}
+
+
+## 处死人违背性格涨压力 (第 8 块): 仁慈 +30、宽恕 +20, 没罪的还让公正的 +20; 残忍的反而 -10
+static func execute_stress(jailer: Person, prisoner: Person, day: int) -> float:
+	var v := 0.0
+	if jailer.has_trait("compassionate"):
+		v += 30.0
+	if jailer.has_trait("forgiving"):
+		v += 20.0
+	if jailer.has_trait("just") and not Feudal.has_crime(prisoner, day):
+		v += 20.0
+	if jailer.has_trait("sadistic"):
+		v -= 10.0
+	return v
 
 
 func toggle_dungeon(prisoner: Person) -> Dictionary:
@@ -1762,6 +1909,489 @@ func set_contract(liege: Person, vassal: Person, level: int, day: int) -> Dictio
 		vassal.remember(liege.id, "让我少交", 15, years, true)
 	vassal.contract = level
 	return {"ok": true, "text": "%s的合同改成「%s」(交税 %d%%、交兵 %d%%)" % [vassal.name, Feudal.CONTRACTS[level], int(Feudal.TAX_SHARE[level] * 100), int(Feudal.LEVY_SHARE[level] * 100)]}
+
+
+# ---- 头衔: 建立公国、王国、帝国, 篡夺 (第 8 块, 照三代) ----
+
+const TITLE_COST := {"duchy": 100, "kingdom": 250, "empire": 500}           # 金币 (三代 250 / 500 / 1000, 按我们的收入缩小)
+const TITLE_PRESTIGE := {"duchy": 150.0, "kingdom": 300.0, "empire": 400.0}
+const TITLE_SHARE := {"duchy": 0.5, "kingdom": 0.5, "empire": 0.8}          # 要控制这么多以上 (照三代: 公国王国一半以上, 帝国八成以上)
+const SPECIAL_COST := {"k_isles": 150, "k_cumbria": 150}                    # 特别决议花的金币
+const DANELAW_PRESTIGE := 100.0
+var dejure_changes := {}   # 公国改了归哪个王国 (特别决议改的; 存档要存)
+
+
+## 一个头衔法理上的领地 (公国 / 王国 / 帝国)
+func title_counties(kind: String, id: String) -> Array:
+	match kind:
+		"duchy":
+			return counties_in_duchy(id)
+		"kingdom":
+			return counties.filter(func(c: Dictionary) -> bool: return duchies[c.duchy].kingdom == id)
+	return counties.duplicate()
+
+
+func title_name(kind: String, id: String) -> String:
+	match kind:
+		"duchy":
+			return duchies[id].name + "公国"
+		"kingdom":
+			return kingdoms[id].name + "王国"
+	return empire.name + "帝国"
+
+
+## 谁拿着这个头衔 (国家 id; 没人是空的)
+func title_holder(kind: String, id: String) -> String:
+	for rid in realm_order:
+		var r: Dictionary = realms[rid]
+		match kind:
+			"duchy":
+				if r.titles.has(id):
+					return rid
+			"kingdom":
+				if r.get("kingdoms", []).has(id):
+					return rid
+			_:
+				if r.get("empire", false):
+					return rid
+	return ""
+
+
+## 这个国家控制了这个头衔的几块地 (国王直辖的和封臣的都算): [控制的, 一共]
+func title_control(kind: String, id: String, rid: String) -> Array:
+	var all := title_counties(kind, id)
+	var mine := all.filter(func(c: Dictionary) -> bool: return c.holder == rid)
+	return [mine.size(), all.size()]
+
+
+## 大国王直辖上限 +1、皇帝 +2 (照三代)
+func rank_bonus(p: Person) -> int:
+	if p.realm == "" or not realms.has(p.realm):
+		return 0
+	var r: Dictionary = realms[p.realm]
+	if r.get("empire", false):
+		return 2
+	return 1 if not r.get("kingdoms", []).is_empty() else 0
+
+
+## 能不能建立 (或者从别人手里篡夺) 这个头衔; 空 = 能
+func create_problem(p: Person, kind: String, id: String) -> String:
+	if p.realm == "" or not realms.has(p.realm):
+		return "只有独立的国王能建立"
+	if not p.adult(today) or p.prisoner_of != "":
+		return "现在做不了 (没成年或者关在大牢里)"
+	var rid := p.realm
+	if title_holder(kind, id) == rid:
+		return "已经是你的了"
+	var r: Dictionary = realms[rid]
+	var ctl := title_control(kind, id, rid)
+	if ctl[1] == 0 or float(ctl[0]) <= ctl[1] * TITLE_SHARE[kind]:
+		return "控制了 %d/%d 块地, 要%s以上" % [ctl[0], ctl[1], "八成" if kind == "empire" else "一半"]
+	match kind:
+		"duchy":
+			if counties_of(rid).size() < 2:
+				return "至少要有两块领地"
+		"kingdom":
+			if r.titles.size() < 2:
+				return "手里至少要有两个公国头衔"
+		"empire":
+			if r.get("kingdoms", []).size() < 2:
+				return "手里至少要有两个王国头衔"
+	if p.gold < TITLE_COST[kind]:
+		return "钱不够 (要 %d 金币, 有 %d)" % [TITLE_COST[kind], int(p.gold)]
+	return ""
+
+
+func create_title(p: Person, kind: String, id: String, day: int, events: Array) -> Dictionary:
+	var why := create_problem(p, kind, id)
+	if why != "":
+		return {"ok": false, "text": why}
+	var rid := p.realm
+	var old := title_holder(kind, id)
+	if old != "":
+		_drop_title(old, kind, id)
+		ruler(old).remember(p.id, "篡夺了我的头衔", -40, day + 20 * GameDate.YEAR_DAYS)
+	var r: Dictionary = realms[rid]
+	match kind:
+		"duchy":
+			r.titles.append(id)
+		"kingdom":
+			if not r.has("kingdoms"):
+				r.kingdoms = []
+			r.kingdoms.append(id)
+		_:
+			r.empire = true
+	p.gold -= TITLE_COST[kind]
+	p.prestige += TITLE_PRESTIGE[kind]
+	_update_title(rid)
+	_feudal_dirty = true
+	events.append({"type": "title", "realm": rid, "person": p.id, "kind": kind, "id": id, "usurped": old, "day": day})
+	return {"ok": true, "text": "%s了%s, 你现在是%s。威望 +%d" % ["篡夺" if old != "" else "建立", title_name(kind, id), r.title, int(TITLE_PRESTIGE[kind])]}
+
+
+func _drop_title(rid: String, kind: String, id: String) -> void:
+	var r: Dictionary = realms[rid]
+	match kind:
+		"duchy":
+			r.titles.erase(id)
+		"kingdom":
+			r.get("kingdoms", []).erase(id)
+		_:
+			r.empire = false
+	_update_title(rid)
+
+
+## 国家的头衔跟着最高的头衔走: 皇帝 > 大国王 > 原来的叫法
+func _update_title(rid: String) -> void:
+	var r: Dictionary = realms[rid]
+	if not r.has("base_title"):
+		r.base_title = r.title
+	if r.get("empire", false):
+		r.title = empire.name + "皇帝"
+	elif not r.get("kingdoms", []).is_empty():
+		r.title = kingdom_ruler_title(r.kingdoms[0])
+	else:
+		r.title = r.base_title
+
+
+## 大国王的叫法: 爱尔兰叫至尊王 (史实: ard rí), 别的叫某某国王
+func kingdom_ruler_title(k: String) -> String:
+	return "爱尔兰至尊王" if k == "ireland" else kingdoms[k].name + "国王"
+
+
+## 两个国家合成一个: 王国、帝国头衔也跟过去
+func _merge_high_titles(target: String, from: Dictionary) -> void:
+	var t: Dictionary = realms[target]
+	for k in from.get("kingdoms", []):
+		if not t.has("kingdoms"):
+			t.kingdoms = []
+		if not t.kingdoms.has(k):
+			t.kingdoms.append(k)
+	if from.get("empire", false):
+		t.empire = true
+	_update_title(target)
+
+
+## 一个公国改归哪个王国 (特别决议用)
+func _set_dejure(duchy: String, kingdom: String) -> void:
+	duchies[duchy].kingdom = kingdom
+	dejure_changes[duchy] = kingdom
+
+
+# ---- 当地的特别决议 (第 8 块, 用户选的 a 丹麦法区、b 群岛王国、c 坎布里亚王国) ----
+
+const SPECIALS := {
+	"danelaw": ["划出丹麦法区", "维京国王跟英格兰的国王谈判划界: 你在英格兰占着的那些公国归你的「丹麦法区王国」, 他当英格兰国王, 两边停战 25 年"],
+	"k_isles": ["建立群岛王国", "把马恩岛和赫布里底群岛升成正式的王国 (奥克尼、加洛韦有你的地也算进来)"],
+	"k_cumbria": ["建立坎布里亚王国", "斯特拉斯克莱德往南扩到加洛韦、卡莱尔, 升成坎布里亚王国, 还多 1000 个不用养的兵"],
+}
+
+
+func _norse(p: Person) -> bool:
+	return Marriage.faith_of(p.culture) == "norse"
+
+
+## 丹麦法区的谈判对象: 英格兰地最多的基督徒国王 (有英格兰王国头衔的优先)
+func danelaw_partner(p: Person) -> Person:
+	var best: Person = null
+	var most := -1
+	for rid in realm_order:
+		if rid == p.realm:
+			continue
+		var k := ruler(rid)
+		if _norse(k):
+			continue
+		var n: int = title_control("kingdom", "england", rid)[0]
+		if realms[rid].get("kingdoms", []).has("england"):
+			n += 1000
+		if n > most and n > 0:
+			most = n
+			best = k
+	return best
+
+
+func special_problem(p: Person, id: String) -> String:
+	if p.realm == "" or not realms.has(p.realm):
+		return "只有独立的国王能做"
+	if not p.adult(today) or p.prisoner_of != "":
+		return "现在做不了"
+	var rid := p.realm
+	var r: Dictionary = realms[rid]
+	if title_holder("kingdom", id) != "":
+		return "%s已经有了" % title_name("kingdom", id)
+	match id:
+		"danelaw":
+			if not _norse(p):
+				return "只有信北欧旧神的维京国王能做"
+			var n: int = title_control("kingdom", "england", rid)[0]
+			if n < 3:
+				return "要在英格兰占着至少 3 块地 (现在 %d)" % n
+			if warfare.is_at_war(p.id):
+				return "正在打仗, 谈不了"
+			if danelaw_partner(p) == null:
+				return "英格兰没有能谈判的国王"
+			if p.prestige < DANELAW_PRESTIGE:
+				return "威望不够 (要 %d)" % int(DANELAW_PRESTIGE)
+			if int(p.decision_used.get("danelaw", -100000)) + 5 * GameDate.YEAR_DAYS > today:
+				return "刚谈过, 五年内不能再谈"
+		"k_isles":
+			if not _norse(p):
+				return "只有信北欧旧神的人能做"
+			var c := title_control("duchy", "isles", rid)
+			if c[0] < c[1]:
+				return "要控制整个群岛公国 (现在 %d/%d)" % [c[0], c[1]]
+		"k_cumbria":
+			if p.culture != "cumbric":
+				return "只有坎布里亚人 (斯特拉斯克莱德) 能做"
+			for d in ["strathclyde", "galloway"]:
+				var c := title_control("duchy", d, rid)
+				if c[0] < c[1]:
+					return "要控制整个%s (现在 %d/%d)" % [title_name("duchy", d), c[0], c[1]]
+			if by_id.carlisle.holder != rid:
+				return "还要控制卡莱尔"
+	if SPECIAL_COST.has(id) and p.gold < SPECIAL_COST[id]:
+		return "钱不够 (要 %d 金币)" % SPECIAL_COST[id]
+	return ""
+
+
+func special_decision(p: Person, id: String, day: int, events: Array) -> Dictionary:
+	var why := special_problem(p, id)
+	if why != "":
+		return {"ok": false, "text": why}
+	var rid := p.realm
+	match id:
+		"danelaw":
+			var partner := danelaw_partner(p)
+			p.decision_used["danelaw"] = day
+			if partner.id == player:
+				events.append({"type": "danelaw_ask", "person": p.id, "partner": partner.id, "day": day})
+				return {"ok": true, "text": "派人去跟%s谈, 等他回话" % partner.name}
+			var mine := warfare.strength(p)
+			var theirs := warfare.strength(partner)
+			if mine < theirs * 0.7 and partner.opinion_of(p).total < 20:
+				partner.remember(p.id, "想跟我划界", -10, day + 5 * GameDate.YEAR_DAYS)
+				return {"ok": false, "text": "%s不肯 (他比你强得多, 也不喜欢你)" % partner.name}
+			return danelaw_apply(p, partner, day, events)
+		"k_isles":
+			p.gold -= SPECIAL_COST[id]
+			for d in ["isles", "orkney", "galloway"]:
+				if d == "isles" or title_control("duchy", d, rid)[0] > 0:
+					_set_dejure(d, "k_isles")
+			return _grant_kingdom(p, "k_isles", 200.0, day, events)
+		"k_cumbria":
+			p.gold -= SPECIAL_COST[id]
+			for d in ["strathclyde", "galloway"]:
+				_set_dejure(d, "k_cumbria")
+			realms[rid].special = int(realms[rid].get("special", 0)) + 1000
+			return _grant_kingdom(p, "k_cumbria", 200.0, day, events)
+	return {"ok": false, "text": "没有这个决议"}
+
+
+## 丹麦法区谈成了: 你在英格兰有地的公国 (他都城那个公国除外) 归丹麦法区; 他没有英格兰王国头衔的话给他; 停战 25 年, 互相好感 +50
+func danelaw_apply(p: Person, partner: Person, day: int, events: Array) -> Dictionary:
+	p.prestige -= DANELAW_PRESTIGE
+	var cap_duchy := ""
+	if partner.realm != "" and realms.has(partner.realm) and realms[partner.realm].capital != "":
+		cap_duchy = by_id[realms[partner.realm].capital].duchy
+	for d in duchies:
+		if duchies[d].kingdom == "england" and d != cap_duchy and title_control("duchy", d, p.realm)[0] > 0:
+			_set_dejure(d, "danelaw")
+	if partner.realm != "" and title_holder("kingdom", "england") == "":
+		if not realms[partner.realm].has("kingdoms"):
+			realms[partner.realm].kingdoms = []
+		realms[partner.realm].kingdoms.append("england")
+		_update_title(partner.realm)
+	warfare.truces[warfare._truce_key(p.realm, partner.realm)] = day + 25 * GameDate.YEAR_DAYS
+	p.remember(partner.id, "跟我划界讲和", 50, day + 25 * GameDate.YEAR_DAYS)
+	partner.remember(p.id, "跟我划界讲和", 50, day + 25 * GameDate.YEAR_DAYS)
+	return _grant_kingdom(p, "danelaw", 0.0, day, events)
+
+
+func _grant_kingdom(p: Person, k: String, prestige: float, day: int, events: Array) -> Dictionary:
+	var r: Dictionary = realms[p.realm]
+	if not r.has("kingdoms"):
+		r.kingdoms = []
+	r.kingdoms.append(k)
+	p.prestige += prestige
+	_update_title(p.realm)
+	_feudal_dirty = true
+	events.append({"type": "title", "realm": p.realm, "person": p.id, "kind": "kingdom", "id": k, "usurped": "", "day": day})
+	return {"ok": true, "text": "建立了%s, 你现在是%s" % [title_name("kingdom", k), r.title]}
+
+
+# ---- 让位 (第 8 块: 压力崩溃第 3 档, 照三代) ----
+
+## 头衔照继承法传给继承人 (玩家接着玩继承人); 他丢 100 威望 (三代 500, 按我们的威望缩小), 对原来的国家有宣称, 留下来当没领地的人
+func abdicate(p: Person, day: int, events: Array) -> void:
+	var was := p.realm
+	var lands := lands_of(p)
+	p.prestige -= 100.0
+	var n := events.size()
+	if was != "":
+		if not p.claims.has("realm:" + was):
+			p.claims.append("realm:" + was)
+		_succeed(was, p, day, events)
+	elif is_landed(p):
+		_hand_down(p, day, events)
+	else:
+		return
+	for i in range(n, events.size()):
+		if events[i].type in ["succession", "extinct", "vassal_succession", "escheat"] and events[i].get("dead", "") == p.id:
+			events[i].abdicated = true
+	var heir: Person = null
+	if was != "" and realms.has(was):
+		heir = ruler(was)
+	elif not lands.is_empty() and people.has(lands[0].lord) and lands[0].lord != p.id:
+		heir = people[lands[0].lord]
+	warfare.on_death(p, heir, day, events)
+	intrigue.on_death(p)
+
+
+# ---- 打仗以后领地换主人 (第 6 块) ----
+
+## 一个国家法理上的公国: 手里的公国头衔 (开局没写的就是跟国家同名的那个), 加上手里王国 (帝国) 头衔下面的公国 (第 8 块)
+func realm_duchies(realm_id: String) -> Array:
+	if not realms.has(realm_id):
+		return []
+	var r: Dictionary = realms[realm_id]
+	var out: Array = r.titles.duplicate()
+	var ks: Array = r.get("kingdoms", [])
+	for d in duchies:
+		if (r.get("empire", false) or ks.has(duchies[d].kingdom)) and not out.has(d):
+			out.append(d)
+	return out
+
+
+## 一块领地归了别的国家 (打赢了抢来的): 原来的主人丢了这块地; 原来的国家一块地都没有了就没了
+func transfer_county(c: Dictionary, to_realm: String, to_lord: Person, day: int, events: Array) -> void:
+	var from_realm: String = c.holder
+	var old: Person = people[c.lord]
+	c.holder = to_realm
+	c.lord = to_lord.id
+	c.occupier = ""
+	if to_lord.realm == "":
+		to_lord.liege_realm = to_realm
+		if to_lord.homeland == "":
+			to_lord.homeland = realm_kingdom(to_realm)
+	_feudal_dirty = true
+	_kin_dirty = true
+	if old != to_lord and realms.has(to_realm):
+		old.remember(ruler(to_realm).id, "抢了我的地", -40, day + 20 * GameDate.YEAR_DAYS)
+	if not realms.has(from_realm):
+		return
+	var left := counties_of(from_realm)
+	if left.is_empty():
+		_destroy_realm(from_realm, day, events)
+		return
+	if realms[from_realm].capital == c.id:
+		var k := ruler(from_realm)
+		var mine := left.filter(func(x: Dictionary) -> bool: return x.lord == k.id)
+		realms[from_realm].capital = (mine[0] if not mine.is_empty() else left[0]).id
+
+
+## 国家一块地都没有了: 国王成了没领地的人
+func _destroy_realm(rid: String, day: int, events: Array) -> void:
+	var k := ruler(rid)
+	var name := realm_name(rid)
+	k.realm = ""
+	k.liege_realm = ""
+	for p in living.values():
+		if p.liege_realm == rid:
+			p.liege_realm = ""
+	_remove_realm(rid)
+	_feudal_dirty = true
+	_kin_dirty = true
+	events.append({"type": "realm_gone", "realm": rid, "name": name, "ruler": k.id, "day": day})
+
+
+## 封臣打赢了独立战争: 他的地和他下面封臣的地成了一个新国家, 他当国王
+func make_independent(p: Person, day: int, events: Array) -> String:
+	var old_rid := p.liege_realm
+	if not realms.has(old_rid):
+		return ""
+	var vice := viceroy_duchy(p)
+	var mine := []
+	for c in counties:
+		if c.holder != old_rid:
+			continue
+		var q: Person = people[c.lord]
+		for i in 4:
+			if q == null:
+				break
+			if q == p:
+				mine.append(c)
+				break
+			q = liege_of(q)
+	if mine.is_empty():
+		return ""
+	var parent: Dictionary = realms[old_rid]
+	var id := "%s_%d" % [mine[0].id, _next_index]
+	var col: Color = parent.color
+	var realm := {
+		"id": id, "title": (duchies[vice].name + "国王") if vice != "" else mine[0].name + "领主",
+		"culture": p.culture, "house": p.house, "ruler_id": p.id, "ruler": p.name,
+		"color": Color.from_hsv(fmod(col.h + 0.11 * (1 + _next_index % 4), 1.0), clampf(col.s, 0.35, 0.8), clampf(col.v * 0.95, 0.35, 0.9)),
+		"random": false, "index": _next_index, "titles": [vice] if vice != "" else [], "viceroys": {}, "capital": "", "special": 0,
+	}
+	_next_index += 1
+	if vice != "":
+		parent.viceroys.erase(vice)
+	realms[id] = realm
+	realm_order.append(id)
+	for c in mine:
+		c.holder = id
+	_feudal_dirty = true
+	for q in living.values():
+		if q != p and q.liege_realm == old_rid and not lands_of(q).is_empty() and lands_of(q)[0].holder == id:
+			q.liege_realm = id
+	_set_ruler(id, p)
+	var own := mine.filter(func(c: Dictionary) -> bool: return c.lord == p.id)
+	realm.capital = (own[0] if not own.is_empty() else mine[0]).id
+	if houses.has(p.house):
+		houses[p.house].color = realm.color
+		houses[p.house].design = realm.index
+	if counties_of(old_rid).is_empty():
+		_destroy_realm(old_rid, day, events)
+	events.append({"type": "independent", "realm": id, "from": old_rid, "person": p.id, "day": day})
+	return id
+
+
+## 宣称王位的仗打赢了: 宣称的人当这个国家的国王 (原来的国王下台, 留在国内当没领地的贵族);
+## 宣称的人本来就是别国的国王, 两个国家合成一个
+func crown_claimant(rid: String, q: Person, att: Person, day: int, events: Array) -> void:
+	var old := ruler(rid)
+	var realm: Dictionary = realms[rid]
+	if q.realm != "" and q.realm != rid and realms.has(q.realm):
+		var target := q.realm
+		for c in counties:
+			if c.holder == rid:
+				c.holder = target
+				if c.lord == old.id:
+					c.lord = q.id
+		for p in living.values():
+			if p.liege_realm == rid:
+				p.liege_realm = target
+		realms[target].titles.append_array(realm.titles)
+		realms[target].viceroys.merge(realm.viceroys)
+		_merge_high_titles(target, realm)
+		old.realm = ""
+		_move_prisoners(old, q)
+		_remove_realm(rid)
+	else:
+		_take_throne(rid, q, day, events)
+		_move_domain(old, q)
+		_move_prisoners(old, q)
+		old.realm = ""
+		old.liege_realm = rid
+		_set_ruler(rid, q)
+		realm.house = q.house
+		if houses.has(q.house):
+			houses[q.house].color = realm.color
+			houses[q.house].design = realm.index
+	old.remember(q.id, "抢了我的王位", -60, day + 30 * GameDate.YEAR_DAYS)
+	_feudal_dirty = true
+	_kin_dirty = true
+	events.append({"type": "crowned", "realm": rid if realms.has(rid) else q.realm, "person": q.id, "old": old.id, "by": att.id, "day": day})
 
 
 ## 近亲 (父母、配偶、子女、兄弟姐妹), 活着的

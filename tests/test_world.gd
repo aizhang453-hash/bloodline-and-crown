@@ -11,7 +11,7 @@ func before_each() -> void:
 func test_counts() -> void:
 	eq(world.counties.size(), 130)
 	eq(world.duchies.size(), 33)
-	eq(world.kingdoms.size(), 4)
+	eq(world.kingdoms.size(), 7, "英格兰、苏格兰、威尔士、爱尔兰 + 能建立的丹麦法区、群岛、坎布里亚 (第 8 块)")
 	eq(world.realms.size(), 26)
 	eq(GameDate.text(world.start_day), "867 年 1 月 1 日")
 

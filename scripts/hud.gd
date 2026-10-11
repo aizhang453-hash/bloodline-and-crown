@@ -68,6 +68,13 @@ const BANNER := Rect2(560, 64, 800, 96)
 const ALERT_Y := 34.0            # 提醒那一排 (照三代的「重要事项」, 放在屏幕上方正中)
 const ALERT_R := 25.0
 const ALERT_GAP := 62.0
+const WAR_ICON_X := 1180.0       # 在打的仗: 右上角资源条左边一排 (第 6 块)
+const WAR_ICON_GAP := 48.0
+const WAR_ICON_R := 19.0
+const ASK_BUTTONS := [Rect2(640, 630, 300, 54), Rect2(980, 630, 300, 54)]   # 问你要不要的窗口: 两个按钮
+const STORY := Rect2(510, 190, 900, 700)          # 随机事件的窗口 (第 8 块, 照三代: 正中间, 左边头像, 右边说的事, 下面几个办法)
+const STORY_BOOK := Rect2(1336, 208, 52, 52)      # 事件窗口右上角的书: 鼠标指着看历史背景 (只有照史料来的事件有)
+const STORY_ICONS := {"家里": "house", "宫廷": "throne", "领地": "tower", "身体": "bust", "打仗": "swords", "阴谋": "intrigue", "史料": "quill"}
 
 # 右边一列: [图标, 颜色, 名字, 第几块做]
 const MENU := [
@@ -77,11 +84,11 @@ const MENU := [
 ]
 # 右上角: [图标, 颜色, 名字, 说明]
 const RESOURCES := [
-	["coins", "e8c860", "金钱", "收税得来的钱。现在能送礼、付赎金; 以后打仗、盖房子都要钱。"],
-	["crown", "e0b850", "威望", "别人有多看得起你。第 3 块「家族和继承」做好了才有。"],
+	["coins", "e8c860", "金钱", "收税得来的钱。送礼、付赎金、养兵、坐船、求和都要钱; 欠钱 (负数) 不能宣战, 打仗吃亏。"],
+	["crown", "e0b850", "威望", "别人有多看得起你。宣战要花威望; 打赢仗、打赢战争会涨。"],
 	["cross", "ece6d6", "虔诚", "你对信仰有多虔诚。第 13 块「宗教」做好了才有。"],
 	["tree", "6fa04a", "名望", "整个王朝的名声。第 16 块「王朝传承」做好了才有。"],
-	["helmet", "b8c0c8", "兵力", "能召集多少兵 (直辖领地的兵 + 封臣交的兵)。第 6 块「打仗」才用得上。"],
+	["helmet", "b8c0c8", "兵力", "能召集多少兵 (直辖领地的兵 + 封臣交的兵)。征兵在右边一列的「军队」; 征着的兵每 1000 人每月 3 金币。"],
 	["tower", "a8a090", "亲自管的领地", "自己亲手管几块领地 / 最多能管几块 (基础 1 + 头衔 2 + 教育: 差 -1、好 +1、出色 +2)。超过的不出钱、不出兵。"],
 ]
 
@@ -114,6 +121,8 @@ var _popup_spots: Array = []
 var _popup_faces: Array = []
 var _notes: Array = []           # 右边的消息: [[文字, 还剩几秒], ...]
 var _stress_spot: Spot
+var _dec_day := -1               # 提醒里的决议是哪天算的 (一天只算一次)
+var _dec_ready: Array = []
 var _res_spots: Array = []       # 右上角六样资源的方块 (说明跟着数字变)
 var alerts: Array = []           # 现在的提醒: [{kind, icon, color, count, tip, click}]
 var _alert_spots: Array = []
@@ -124,6 +133,8 @@ var _window_spots: Array = []
 var _window_faces: Array = []
 var _popup_queue: Array = []     # 等着跳出来的窗口 (一次只开一个)
 var name_edit: LineEdit          # 起名窗口里自己写名字的框 (开着起名窗口时才有)
+var _war_spots: Array = []       # 右上角在打的仗的小图标 (第 6 块)
+var _war_key := ""
 
 
 func _init(p_world: World, p_clock: Clock, p_map: MapView) -> void:
@@ -194,6 +205,19 @@ func show_popup(data: Dictionary) -> void:
 		_make_rules()
 		redraw()
 		return
+	if data.kind == "ask":
+		_spot(ASK_BUTTONS[0], data.get("yes_tip", ""), _answer.bind(true), _popup_spots)
+		_spot(ASK_BUTTONS[1], data.get("no_tip", ""), _answer.bind(false), _popup_spots)
+		redraw()
+		return
+	if data.kind == "info":
+		_spot(POPUP_BUTTON, "", close_popup, _popup_spots)
+		redraw()
+		return
+	if data.kind == "story":
+		_make_story_popup(data)
+		redraw()
+		return
 	var e: Dictionary = data.event
 	if data.kind == "birth":
 		_make_birth_popup(data)
@@ -219,7 +243,10 @@ func show_popup(data: Dictionary) -> void:
 func close_popup() -> void:
 	if popup.is_empty():
 		return
-	var game_over: bool = popup.kind in ["game_over", "vassal_over"]
+	if popup.kind == "story" and not popup.get("done", false):
+		_pick_story(world.story.first_ok(popup.story))  # 事件一定要选一个办法 (程序里直接关的, 当作选第一个能选的)
+		return
+	var game_over: bool = popup.kind in ["game_over", "vassal_over"] or popup.get("over", false)
 	if popup.kind == "menu":
 		clock.paused = popup.was_paused
 	if game_over and world.rules.ironman == "on":
@@ -325,6 +352,7 @@ func _pick_name(n: String) -> void:
 func redraw() -> void:
 	_sync_faces()
 	_update_alerts()
+	_update_war_icons()
 	_root.queue_redraw()
 
 
@@ -364,6 +392,40 @@ func alerts_now() -> Array:
 		out.append({"kind": "domain", "icon": "tower", "color": Look.RED, "count": inc.domain - inc.limit,
 				"tip": "直辖领地 %d 块, 超过上限 %d 块: 多出来的 %d 块不出钱、不出兵。\n(点一下: 打开你的国家, 把领地封出去)" % [inc.domain, inc.limit, inc.domain - inc.limit],
 				"click": _open_realm_window})
+	# 打仗: 战争分数到了, 能逼对方答应了
+	for war in world.warfare.wars_of(m.id):
+		var lead_side: int = 1 if war.attacker == m.id else (-1 if war.defender == m.id else 0)
+		if lead_side != 0 and world.warfare.score(war).total * lead_side >= 100.0:
+			out.append({"kind": "enforce", "icon": "crown", "color": Look.GREEN, "count": 1,
+					"tip": "%s: 战争分数到 100 了, 可以逼对方答应\n(点一下: 打开这场仗)" % _war_title(war),
+					"click": _open_war.bind(int(war.id))})
+			break
+	# 阴谋: 机会攒够了能动手; 有人在暗害你 (发现了)
+	for sc in world.intrigue.schemes_of(m.id):
+		if sc.kind == "murder" and int(sc.advantages) >= Schemes.READY:
+			out.append({"kind": "scheme_ready", "icon": "p_dagger", "color": Look.GREEN, "count": 1,
+					"tip": "暗杀%s: 机会攒够了, 可以动手 (成功率 %d%%)\n(点一下: 打开这个阴谋)" % [world.people[sc.target].name, int(world.intrigue.success(sc).total)],
+					"click": _open_scheme.bind(int(sc.id))})
+			break
+	var plots := world.intrigue.known_against(m.id)
+	if not plots.is_empty():
+		out.append({"kind": "plot", "icon": "p_dagger", "color": Look.RED, "count": plots.size(),
+				"tip": "有人在密谋暗杀你: %s\n(点一下: 看他是谁; 他在你的国家里的话, 可以照他的罪关起来)" % "、".join(plots.map(func(x: Dictionary) -> String: return world.people[x.owner].name)),
+				"click": show_person.bind(plots[0].owner)})
+	# 决议: 能建立 (篡夺) 的头衔、能做的特别决议 (照三代的「可以建立头衔」提醒); 一天只算一次
+	if _dec_day != day:
+		_dec_day = day
+		_dec_ready = Decisions.list_for(world, m).filter(func(r: Dictionary) -> bool: return r.ok and not String(r.id).begins_with("coping:"))
+	if not _dec_ready.is_empty():
+		out.append({"kind": "decision", "icon": "crown", "color": Look.GREEN, "count": _dec_ready.size(),
+				"tip": "能做的决议: %s\n(点一下: 打开决议)" % "、".join(_dec_ready.map(func(r: Dictionary) -> String: return r.name)),
+				"click": _open_decisions})
+	# 压力到了一档, 有排解压力的决议能做
+	if m.stress >= Person.STRESS_PER_LEVEL:
+		var cope := Decisions.list_for(world, m).filter(func(r: Dictionary) -> bool: return r.ok and String(r.id).begins_with("coping:")) if not m.coping().is_empty() else []
+		if not cope.is_empty():
+			out.append({"kind": "cope", "icon": "candle", "color": Look.RED, "count": 1,
+					"tip": "压力 %d: 可以「%s」排解一下\n(点一下: 打开决议)" % [int(m.stress), cope[0].name], "click": _open_decisions})
 	# 有人关在你的大牢里
 	var held := world.living.values().filter(func(p: Person) -> bool: return p.alive and p.prisoner_of == m.id)
 	if not held.is_empty():
@@ -584,6 +646,10 @@ func _make_spots() -> void:
 		var m: Array = MENU[i]
 		if i == 0:
 			_spot(Rect2(1878, RIGHT_MENU_Y[i] - 20, 42, 40), "领地: 你的直辖领地、封臣, 把领地封出去", _open_realm_window)
+		elif i == 1:
+			_spot(Rect2(1878, RIGHT_MENU_Y[i] - 20, 42, 40), "军队: 征兵、解散、谁带兵, 在打的仗", _open_army_window)
+		elif i == 4:
+			_spot(Rect2(1878, RIGHT_MENU_Y[i] - 20, 42, 40), "阴谋: 你在搞的阴谋、有人在害你、你知道的秘密、你攥着的把柄", _open_schemes_window)
 		else:
 			_spot(Rect2(1878, RIGHT_MENU_Y[i] - 20, 42, 40), m[2], later.bind(m[2], m[3]))
 	# 左下角
@@ -599,6 +665,10 @@ func _make_spots() -> void:
 		var r: float = BOTTOM_ROW[i][1]
 		if i == 1:
 			_stress_spot = _spot(Rect2(c - Vector2(r, r), Vector2(r * 2 + 62, r * 2)), "压力", _open_player)
+		elif i == 2:
+			_spot(Rect2(c - Vector2(r, r), Vector2(r, r) * 2), "召集军队 (打开军队窗口)", _open_army_window)
+		elif i == 3:
+			_spot(Rect2(c - Vector2(r, r), Vector2(r, r) * 2), "决议: 建立公国、王国 (别人拿着就是篡夺)、当地特别的决议、排解压力", _open_decisions)
 		else:
 			_spot(Rect2(c - Vector2(r, r), Vector2(r, r) * 2), bottom[i][0], later.bind(bottom[i][0], bottom[i][1]))
 	# 右下角: 日期和速度
@@ -671,11 +741,13 @@ func _make_person_spots() -> void:
 		var al := world.allies(p.realm).map(func(r: String) -> String: return world.realm_name(r))
 		var tyr := ("\n——\n暴政 %d: 做了不正当的事 (没理由收回领地、关人、让封臣多交、处死), 封臣对他好感 %d, 每月降 %.2f" % [int(p.tyranny), -int(p.tyranny / 2.0), Feudal.TYRANNY_DECAY]) if p.tyranny >= 1.0 else ""
 		_spot(CHAR_ALLIES, ("同盟: %s" % "、".join(al) if not al.is_empty() else "还没有同盟") +
-				"\n两个国王的近亲 (本人、父母、子女、兄弟姐妹、祖孙) 结了婚, 两国就是同盟。\n第 6 块「打仗」做好以后, 盟友会来帮忙" + tyr, Callable(), _person_spots)
+				"\n两个国王的近亲 (本人、父母、子女、兄弟姐妹、祖孙) 结了婚, 两国就是同盟。\n打仗时盟友会来帮忙 (保卫战容易答应)" + tyr, Callable(), _person_spots)
 	elif p.alive and _status_line(p) != "":
 		_spot(CHAR_ALLIES, _status_tip(p), (show_person.bind(world.liege_of(p).id) if world.liege_of(p) != null else Callable()), _person_spots)
-	_spot(CHAR_STRESS, "压力 %d (第 %d 档)\n做违背自己性格的事会涨, 每年自己降 %d%s。\n100 点一档; 到了一档会崩溃出事 (崩溃的事件第 8 块才有)。" % [
-			int(p.stress), p.stress_level(), int(Person.STRESS_DECAY * (2 if p.has_trait("calm") else 1)), " (冷静的人降两倍)" if p.has_trait("calm") else ""],
+	var cope_n := p.coping().size()
+	_spot(CHAR_STRESS, "压力 %d (第 %d 档, 最多 %d)\n做违背自己性格的事、家里人去世会涨; 每年自己降 %d%s%s。\n100 点一档, 第 2 档起健康变差 (第 2 档 -1、第 3 档 -2);\n涨过 100 / 200 / 300 会崩溃: 染上排解压力的毛病, 第 3 档还可能疯掉、让位、寻死。\n左下角「决议」里有排解压力的法子 (有排解压力的毛病才有)。" % [
+			int(p.stress), p.stress_level(), int(Person.MAX_STRESS), int(Person.STRESS_DECAY * (2 if p.has_trait("calm") else 1)), " (冷静的人降两倍)" if p.has_trait("calm") else "",
+			(", 排解压力的毛病让它降得快 %d%%" % int(cope_n * Person.COPING_DECAY * 100)) if cope_n > 0 else ""],
 			Callable(), _person_spots)
 	var badges := _person_badges(p)
 	for i in badges.size():
@@ -833,7 +905,7 @@ func _focus_person_realm() -> void:
 
 ## 一个人身上的特点牌子: 先性格, 再天生的, 最后教育
 func _person_badges(p: Person) -> Array:
-	var list: Array = p.personality() + p.congenital()
+	var list: Array = p.personality() + p._of_kind("stress") + p.coping() + p.congenital()
 	if p.childhood() != "":
 		list.push_front(p.childhood())
 	if not p.education.is_empty():
@@ -879,6 +951,10 @@ func _trait_tip(what: Variant) -> String:
 	elif info.get("kind", "") == "congenital":
 		var inherit := int(info.get("inherit", 0))
 		lines.append("天生的: 爸妈一个有, 孩子有 %d%% 的机会也有 (两个都有翻倍)" % inherit if inherit > 0 else "天生的 (不遗传)")
+	elif info.get("kind", "") == "coping":
+		lines.append("排解压力的毛病 (压力太大崩溃时染上的): 压力降得快 %d%%;\n左下角「决议」里能「%s」, 三年一次" % [int(Person.COPING_DECAY * 100), info.decision.name])
+	elif info.get("kind", "") == "stress":
+		lines.append("压力太大崩溃时染上的")
 	elif info.get("kind", "") == "childhood":
 		lines.append("小时候的性格 (3 岁到 16 岁): 学%s合适" % "、".join(info.focus.map(func(s: String) -> String: return Traits.skill_info(s).name)))
 		lines.append("长大以后多半有「%s」里的一个" % "」「".join(info.grows_into.map(func(t: String) -> String: return Traits.get_trait(t).name)))
@@ -908,7 +984,7 @@ func _open_teacher() -> void:
 ## 右边的窗口: match 说亲、teacher 教育、actions 互动 (跟着人物窗口里的人); realm 你的国家、grant 封地 (跟着玩家)
 func _open_window(kind: String, tab := 0, extra := {}) -> void:
 	close_window()
-	var pid := person_id if kind in ["match", "teacher", "actions"] else player_id
+	var pid := person_id if kind in ["match", "teacher", "actions", "declare"] else player_id
 	if pid == "" or not world.people.has(pid):
 		return
 	var p: Person = world.people[pid]
@@ -927,6 +1003,22 @@ func _open_window(kind: String, tab := 0, extra := {}) -> void:
 			window.rows = _realm_rows(p)
 		"grant":
 			window.rows = _grant_rows(p, extra)
+		"army":
+			window.rows = _army_rows(p)
+		"war":
+			window.rows = _war_rows(p, int(extra.get("war", -1)))
+		"declare":
+			window.rows = _declare_rows(p)
+		"commander":
+			window.rows = _commander_rows(p)
+		"schemes":
+			window.rows = _schemes_rows(p)
+		"scheme":
+			window.rows = _scheme_rows(p, int(extra.get("scheme", -1)))
+		"agents":
+			window.rows = _agent_rows(p, int(extra.get("scheme", -1)))
+		"decisions":
+			window.rows = Decisions.list_for(world, p)
 	_make_window_spots()
 	redraw()
 
@@ -997,7 +1089,16 @@ func _win_row_rect(i: int) -> Rect2:
 
 ## 名单从哪里开始: 说亲、教育上面有一排按钮, 别的窗口往上挪
 func _row_top() -> float:
+	if window.get("kind", "") == "war":
+		return WINDOW.position.y + 440  # 上面是战争分数和两边
+	if window.get("kind", "") == "scheme":
+		return WINDOW.position.y + 420  # 上面是成功率、机会、保密、内应
 	return WIN_ROW_Y if window.get("kind", "") in ["match", "teacher"] else WINDOW.position.y + 136
+
+
+## 一页放几行 (下面留出翻页的地方)
+func _win_rows() -> int:
+	return mini(WIN_ROWS, int((WINDOW.end.y - 70.0 - _row_top()) / WIN_ROW_H))
 
 
 func _win_tab_rect(i: int, n: int) -> Rect2:
@@ -1006,7 +1107,7 @@ func _win_tab_rect(i: int, n: int) -> Rect2:
 
 
 func _win_pages() -> int:
-	return maxi(1, ceili(window.rows.size() / float(WIN_ROWS)))
+	return maxi(1, ceili(window.rows.size() / float(_win_rows())))
 
 
 func _make_window_spots() -> void:
@@ -1023,8 +1124,8 @@ func _make_window_spots() -> void:
 			var info := Traits.skill_info(tracks[i].skill)
 			var fits := Traits.focus_fits(p.childhood(), tracks[i].skill)
 			_spot(_win_tab_rect(i, tracks.size()), "学%s: %s%s" % [tracks[i].name, tracks[i].desc, "\n(合他小时候的性格, 学得好一些)" if fits else ""], _set_focus.bind(tracks[i].skill), _window_spots)
-	var start: int = window.page * WIN_ROWS
-	for i in range(start, mini(start + WIN_ROWS, window.rows.size())):
+	var start: int = window.page * _win_rows()
+	for i in range(start, mini(start + _win_rows(), window.rows.size())):
 		var r: Dictionary = window.rows[i]
 		var rect := _win_row_rect(i - start)
 		_spot(rect, _row_tip(p, r), _choose_row.bind(i), _window_spots)
@@ -1052,8 +1153,18 @@ func _row_tip(p: Person, r: Dictionary) -> String:
 			return _match_tip(p, r)
 		"teacher":
 			return _teacher_tip(p, r)
-		"actions":
+		"actions", "army", "war", "declare", "schemes", "scheme", "decisions":
 			return "%s\n%s%s" % [r.name, r.get("tip", r.desc), ("\n(做不了: %s)" % r.why) if not r.ok else ("\n(要点两次: 第一次点了再点一次才算数)" if r.harsh else "")]
+		"agents":
+			var q: Person = r.person
+			var sc: Dictionary = world.intrigue.schemes.get(int(window.get("scheme", -1)), {})
+			if sc.is_empty():
+				return q.name
+			return _parts_text("%s (%d 岁)\n当内应能让成功率上限 +%d\n%s" % [q.name, q.age(clock.day), int(r.value), "肯不肯: %+d (大于 0 就肯)" % int(r.acc.total)], r.acc.parts, false) + "\n(点一下拉他入伙: %s)" % r.how
+		"commander":
+			var c: Person = r.person
+			return "%s (%d 岁)\n军事 %d: 带兵的优势就是他的军事 (国王亲自带 +%d)\n武力 %d: 武力高的打输了不容易被抓、战死\n(点一下让他带兵)" % [
+					c.name, c.age(clock.day), r.martial, War.ADV_LIEGE, r.prowess]
 		"realm":
 			return _realm_tip(r)
 		"grant":
@@ -1111,6 +1222,70 @@ func _actions_for(p: Person) -> Array:
 				world.lands_of(p).size(), why_t, 30 if world.vassal_kind(p) == "郡长" else 40,
 				"关着的人不能不肯" if p.prisoner_of != "" else ("他对你好感 %+d: %s" % [o, "好感不小于 0, 会交出来" if will else "好感小于 0, 不肯交。不肯算抗命, 你就有理由把他关起来 (关了再收回不算暴政)"])],
 				"ok": true, "why": "", "harsh": true, "do": func(ev: Array) -> Dictionary: return world.revoke(m, p, day, ev)})
+	# 打仗 (第 6 块): 对别国的国王宣战; 封臣对自己的国王宣布独立; 在跟他打的仗
+	var wf := world.warfare
+	var at_war := wf.war_between(m.id, p.id)
+	if not at_war.is_empty():
+		acts.append({"name": "看这场仗", "icon": "swords", "desc": "%s · 战争分数 %+d (你这边看)" % [_war_title(at_war), int(wf.score(at_war).total * wf.side(at_war, m.id))],
+				"ok": true, "why": "", "harsh": false, "nav": true, "do": func(_ev: Array) -> Dictionary:
+					_open_war(int(at_war.id))
+					return {"ok": true, "text": ""}})
+	elif p.realm != "" and (m.realm != "" or world.liege_of(m) == p or m.liege_realm == p.realm):
+		var opts := wf.cb_options(m, p)
+		var label := "宣布独立" if world.liege_of(m) == p or (m.realm == "" and m.liege_realm == p.realm) else "宣战"
+		var ok := opts.any(func(o: Dictionary) -> bool: return o.ok)
+		var why: String = "没有宣战的理由 (要有宣称、你手里公国的地, 或者信仰不同又挨着)" if opts.is_empty() else opts[0].why
+		acts.append({"name": label + "…", "icon": "swords", "desc": ("有 %d 个理由可以打%s, 点开挑一个" % [opts.size(), "" if ok else " (现在都打不了)"]) if not opts.is_empty() else why,
+				"ok": not opts.is_empty(), "why": why, "harsh": false, "nav": true,
+				"do": func(_ev: Array) -> Dictionary:
+					_open_window("declare")
+					return {"ok": true, "text": ""}})
+	# 阴谋 (第 7 块): 暗杀、拉拢; 你知道他的秘密: 揭发、勒索; 你攥着他的把柄
+	var ig := world.intrigue
+	var mine_murder := ig.scheme_of(m.id, "murder")
+	if not mine_murder.is_empty() and mine_murder.target == p.id:
+		var sid: int = mine_murder.id
+		acts.append({"name": "看暗杀他的阴谋", "icon": "p_dagger", "desc": "成功率 %d%% · 机会 %d/%d" % [int(ig.success(mine_murder).total), int(mine_murder.advantages), Schemes.READY],
+				"ok": true, "why": "", "harsh": false, "nav": true, "do": func(_ev: Array) -> Dictionary:
+					_open_scheme(sid)
+					return {"ok": true, "text": ""}})
+	else:
+		var why_m := ig.start_problem(m, p, "murder")
+		var stress := 0.0
+		for tr in Schemes.STRESS:
+			if m.has_trait(tr):
+				stress += Schemes.STRESS[tr]
+		acts.append({"name": "暗杀", "icon": "p_dagger",
+				"desc": "开始一个暗杀他的阴谋: 你自己能让成功率最高到 %d%%, 内应能再加; 大约每 %d 天攒一次机会, 攒够 %d 次能动手%s" % [
+					int(minf(Schemes.OWN_POTENTIAL_MAX, m.skill("intrigue", day) * Schemes.OWN_POTENTIAL_PER)),
+					int(maxf(Schemes.PHASE_MIN, Schemes.PHASE_DAYS - Schemes.PHASE_PER_SKILL * m.skill("intrigue", day))), Schemes.READY,
+					(" · 你良心不安, 压力 +%d" % int(stress)) if stress > 0.0 else ""],
+				"ok": why_m == "", "why": why_m, "harsh": true, "nav": true, "do": func(ev: Array) -> Dictionary:
+					var r := ig.start(m, p, "murder", day, ev)
+					if r.ok:
+						_open_scheme(int(r.scheme))
+					return r})
+	var mine_sway := ig.scheme_of(m.id, "sway")
+	if mine_sway.is_empty() or mine_sway.target != p.id:
+		var why_s := ig.start_problem(m, p, "sway")
+		acts.append({"name": "拉拢", "icon": "decree",
+				"desc": "花一段时间讨好他 (外交越高越快): 成了他对你好感 +%d (十年); 没成 %d, 以后不能再拉拢他" % [Schemes.SWAY_GAIN, Schemes.SWAY_FAIL],
+				"ok": why_s == "", "why": why_s, "harsh": false, "do": func(ev: Array) -> Dictionary: return ig.start(m, p, "sway", day, ev)})
+	for pair in ig.secrets_known_by(m):
+		if pair[0] != p:
+			continue
+		var sec: Dictionary = pair[1]
+		var txt := ig.secret_text(p, sec)
+		acts.append({"name": "揭发: " + txt, "icon": "torch", "desc": "他丢 %d 威望, 被害人的家人恨他, 算有罪 (关他、收他的地不算暴政)" % int(Schemes.EXPOSE_PRESTIGE.get(sec.type, 25.0)),
+				"ok": true, "why": "", "harsh": true, "do": func(ev: Array) -> Dictionary: return ig.expose(m, p, sec, day, ev)})
+		if not ig.hook_on(m, p).get("strong", false):
+			acts.append({"name": "勒索: " + txt, "icon": "decree", "desc": "拿这件事要挟他, 他给你一个强把柄; 不给你就揭发",
+					"ok": true, "why": "", "harsh": true, "do": func(ev: Array) -> Dictionary: return ig.blackmail(m, p, sec, day, ev)})
+	if not ig.hook_on(m, p).is_empty():
+		var h: Dictionary = ig.hook_on(m, p)
+		acts.append({"name": "你攥着他的把柄 (%s)" % ("强" if h.strong else "弱"), "icon": "decree",
+				"desc": "说亲他直接答应、关他一定抓到、收他的地他一定交、拉他当内应一定来; 他不能对你宣战、不能关你" + ("" if ig.hook_ready(m, p, day) else " · 五年内用过, 还不能再用"),
+				"ok": false, "why": "不用点, 用得上的时候自动用", "harsh": false, "do": func(_ev: Array) -> Dictionary: return {"ok": false, "text": ""}})
 	if p.prisoner_of == "" and world.arrest_problem(m, p) == "":
 		var just2 := Feudal.has_crime(p, day)
 		acts.append({"name": "关进大牢", "icon": "tower", "desc": "抓到的机会 %d%% (比你和他的密谋本事)。%s; 他的家人好感 -20" % [
@@ -1130,14 +1305,449 @@ func _do_action(i: int) -> void:
 		_root.queue_redraw()
 		return
 	var events := []
+	var kind: String = window.kind
+	var keep := window.duplicate()
 	var r: Dictionary = act.do.call(events)
-	toast(r.text)
-	var pid: String = window.person
+	if r.get("text", "") != "":
+		toast(r.text)
+	var pid: String = keep.person
 	if not events.is_empty():
 		events_happened.emit(events)
-	if person_id == pid:
-		_make_person_spots_again()
-		_open_window("actions")
+	if act.get("nav", false):
+		return  # 这一行是去别的窗口 (已经打开了)
+	match kind:
+		"actions":
+			if person_id == pid:
+				_make_person_spots_again()
+				_open_window("actions")
+		"declare":
+			if r.ok:
+				var war := world.warfare.war_between(player_id, act.target)
+				if not war.is_empty():
+					_open_window("war", 0, {"war": int(war.id)})
+				else:
+					close_window()
+			else:
+				_open_window("declare")
+		"war":
+			if world.warfare.war_by_id(int(keep.war)).is_empty():
+				_open_army_window()
+			else:
+				_open_window("war", 0, {"war": int(keep.war)})
+		"army":
+			_open_window("army")
+		"schemes":
+			_open_schemes_window()
+		"scheme":
+			if world.intrigue.schemes.has(int(keep.scheme)):
+				_open_scheme(int(keep.scheme))
+			else:
+				_open_schemes_window()
+		"decisions":
+			_open_window("decisions")
+			_dec_day = -1
+			refresh_person()
+
+
+# ---- 军队、打仗 (第 6 块) ----
+
+func _open_army_window() -> void:
+	if player_id == "":
+		toast("先选一个人来玩")
+		return
+	_open_window("army")
+
+
+func _open_war(id: int) -> void:
+	if player_id != "":
+		_open_window("war", 0, {"war": id})
+
+
+## 一场仗的名字: 「威塞克斯 对 维京大军」(进攻方在前)
+func _war_title(war: Dictionary) -> String:
+	return "%s 对 %s" % [_side_name(war.attacker), _side_name(war.defender)]
+
+
+func _side_name(pid: String) -> String:
+	if not world.people.has(pid):
+		return "?"
+	var p: Person = world.people[pid]
+	return world.realm_name(p.realm) if p.realm != "" and world.realms.has(p.realm) else p.name
+
+
+## 军队现在在干什么
+func _army_status(a: Dictionary) -> String:
+	var wf := world.warfare
+	var here: String = world.by_id[a.loc].name
+	if int(a.battle) != -1:
+		return "正在%s打仗" % here
+	if int(a.gather) > 0:
+		return "在%s集合, 还要 %d 天" % [here, int(a.gather)]
+	if int(a.retreat) > 0:
+		return "打输了, 正在撤退"
+	if not a.path.is_empty():
+		var days: float = -a.leg
+		for e in a.path:
+			days += e[1]
+		return "正在去%s, 还要 %d 天" % [world.by_id[a.path[a.path.size() - 1][0]].name, ceili(days)]
+	if wf.sieges.has(a.loc):
+		return "正在围%s: %d%%" % [here, int(100.0 * wf.sieges[a.loc].progress / wf.siege_needed(world.by_id[a.loc]))]
+	return "停在%s" % here
+
+
+func _select_army(id: int) -> void:
+	map.selected_army = id
+	var a: Dictionary = world.warfare.armies.get(id, {})
+	if not a.is_empty():
+		map.focus(world.warfare.army_pos(a), maxf(map.zoom(), 0.9))
+	map.overlay.queue_redraw()
+
+
+## 军队窗口: 你的军队 (征兵、解散、谁带兵), 在打的仗
+func _army_rows(m: Person) -> Array:
+	var wf := world.warfare
+	var day := clock.day
+	var rows := []
+	var a := wf.army_of(m.id)
+	if not a.is_empty():
+		var aid: int = a.id
+		rows.append({"name": "你的军队: %d 人" % int(wf.soldiers(a)), "icon": "swords", "desc": _army_status(a) + " · 点一下选中它",
+				"tip": "农民兵 %d、不用养的兵 %d; 每月养兵 %.1f 金币\n选中以后, 右键点地图上的一块地, 军队就走过去 (隔海会坐船)" % [int(a.levy), int(a.special), wf.upkeep(a)],
+				"ok": true, "why": "", "harsh": false, "nav": true, "do": func(_ev: Array) -> Dictionary:
+					close_window()
+					_select_army(aid)
+					return {"ok": true, "text": "选中了军队: 右键点地图上的一块地, 让它走过去"}})
+		var c: Person = world.people.get(a.commander)
+		rows.append({"name": "带兵的人: %s" % (c.name if c != null else "没有"), "icon": "helmet",
+				"desc": ("军事 %d · 点一下换人" % c.skill("martial", day)) if c != null else "没人带兵, 打仗没有优势 · 点一下选人",
+				"ok": true, "why": "", "harsh": false, "nav": true, "do": func(_ev: Array) -> Dictionary:
+					_open_window("commander")
+					return {"ok": true, "text": ""}})
+		var why := wf.can_disband(a)
+		rows.append({"name": "解散军队", "icon": "banner", "desc": "兵回家, 不用再花钱养; 下次征兵按剩下的人算, 每月补一成",
+				"ok": why == "", "why": why, "harsh": false, "do": func(_ev: Array) -> Dictionary:
+					map.selected_army = -1
+					return wf.disband(a)})
+	else:
+		var why := wf.can_raise(m)
+		var lv := wf.levy_of(m)
+		var extra := (" + 不用养的 %d 人" % int(lv.special)) if lv.special > 0.0 else ""
+		rows.append({"name": "征兵", "icon": "swords",
+				"desc": "能征 %d 人%s (满员 %d, 补到 %d 成) · 每月养兵 %.1f 金币" % [int(lv.levy), extra, int(lv.full), roundi(m.levy_ratio * 10), lv.levy / 1000.0 * War.UPKEEP_PER_1000],
+				"tip": "在都城集合 (国家越大集合越久, 集合时打仗吃亏)。征着的兵每 1000 人每月 %d 金币; 不用养的兵不花钱, 但死了不补。" % int(War.UPKEEP_PER_1000),
+				"ok": why == "", "why": why, "harsh": false, "do": func(_ev: Array) -> Dictionary:
+					var r := wf.raise(m, day)
+					if r.ok:
+						map.selected_army = int(wf.army_of(m.id).id)
+					return r})
+	for war in wf.wars_of(m.id):
+		var wid: int = war.id
+		var sc := int(wf.score(war).total * wf.side(war, m.id))
+		rows.append({"name": _war_title(war), "icon": War.CB_ICONS.get(war.cb, "swords"),
+				"desc": "%s: %s · 战争分数 %+d · 打了 %d 个月 · 点一下看" % [War.cb_name(war.cb), war.label, sc, int(war.months)],
+				"ok": true, "why": "", "harsh": false, "nav": true, "do": func(_ev: Array) -> Dictionary:
+					_open_war(wid)
+					return {"ok": true, "text": ""}})
+	if wf.wars_of(m.id).is_empty():
+		rows.append({"name": "现在没在打仗", "icon": "decree", "desc": "宣战: 打开对方国王的人物窗口, 点「互动」里的「宣战」",
+				"ok": false, "why": "没在打仗", "harsh": false, "do": func(_ev: Array) -> Dictionary: return {"ok": false, "text": ""}})
+	return rows
+
+
+## 赢了 / 输了会怎样 (s: 1 进攻方赢, -1 防守方赢)
+func _outcome(war: Dictionary, s: int) -> String:
+	var att: Person = world.people[war.attacker]
+	if s == -1:
+		match war.cb:
+			"claim":
+				return "宣称没了"
+			"independence":
+				return "%s被关进大牢" % att.name
+		return "%s赔 %d 金币" % [att.name, War.loser_pays(world.income(att).gold)]
+	match war.cb:
+		"claim":
+			var q: Person = world.people.get(war.claimant, att)
+			if war.target.begins_with("realm:"):
+				return "%s当%s的国王" % [q.name, world.realm_name(war.target.substr(6))] if world.realms.has(war.target.substr(6)) else "%s当国王" % q.name
+			return "%s归%s" % [world.by_id[war.target.substr(7)].name, q.name]
+		"independence":
+			return "%s自立为王" % att.name
+		"punitive":
+			return "%s赔 %d 金币" % [world.people[war.defender].name, War.loser_pays(world.income(world.people[war.defender]).gold)]
+	return "%s归%s" % ["、".join(war.targets.map(func(id: String) -> String: return world.by_id[id].name)), _side_name(war.attacker)]
+
+
+## 战争窗口: 下面是能做的事 (逼他答应、求和、花钱求和、投降、叫盟友)
+func _war_rows(m: Person, war_id: int) -> Array:
+	var wf := world.warfare
+	var war := wf.war_by_id(war_id)
+	var rows := []
+	if war.is_empty():
+		return rows
+	var day := clock.day
+	var s := wf.side(war, m.id)
+	var sc: float = wf.score(war).total * s
+	var lead: bool = war.attacker == m.id or war.defender == m.id
+	if not lead:
+		rows.append({"name": "你是来帮忙的", "icon": "decree", "desc": "只有两边带头的人能谈和; 你的军队可以帮着打",
+				"ok": false, "why": "只有带头的人能谈和", "harsh": false, "do": func(_ev: Array) -> Dictionary: return {"ok": false, "text": ""}})
+		return rows
+	var other: Person = world.people[war.defender if s == 1 else war.attacker]
+	rows.append({"name": "逼他答应" if s == 1 else "逼他认输", "icon": "crown", "desc": _outcome(war, s) + "; 停战 5 年",
+			"ok": sc >= 100.0, "why": "战争分数到 100 才行 (现在 %+d)" % int(sc), "harsh": true,
+			"do": func(ev: Array) -> Dictionary:
+				wf.end_war(war, "attacker" if s == 1 else "defender", day, ev)
+				return {"ok": true, "text": "打赢了: " + _outcome(war, s)}})
+	var white_ok := wf.takes_white(war, -s)
+	rows.append({"name": "求和 (平局)", "icon": "decree",
+			"desc": "两边都不拿东西, 停战 5 年%s" % ((" · 征服打成平局你丢 %d 威望" % int(War.WHITE_CONQUEST)) if war.cb == "conquest" and s == 1 else ""),
+			"ok": white_ok, "why": ("打了不到三个月, %s不肯" % other.name) if int(war.months) < 3 else "%s占着上风, 不肯平局" % other.name, "harsh": true,
+			"do": func(ev: Array) -> Dictionary:
+				wf.end_war(war, "white", day, ev)
+				return {"ok": true, "text": "平局收场, 停战 5 年"}})
+	if s == -1:
+		var price := wf.price_of(war)
+		var why := "钱不够 (有 %d, 要 %d)" % [int(m.gold), price] if m.gold < price else "%s快赢了, 不肯收钱" % other.name
+		rows.append({"name": "花钱求和: %d 金币" % price, "icon": "coins", "desc": "给%s %d 金币, 他就收兵回去, 停战 5 年" % [other.name, price],
+				"tip": "花钱求和: 给%s %d 金币换和平, 停战 5 年。\n价钱 = 50 + 你 8 个月的收入, 被打得越惨要得越多。维京人、来讨伐的人好说话。" % [other.name, price],
+				"ok": m.gold >= price and wf.takes_money(war), "why": why, "harsh": true,
+				"do": func(ev: Array) -> Dictionary:
+					wf.end_war(war, "bought", day, ev, price)
+					return {"ok": true, "text": "给了%s %d 金币, 他收兵回去了" % [other.name, price]}})
+	rows.append({"name": "投降", "icon": "banner", "desc": "认输: " + _outcome(war, -s) + "; 停战 5 年", "ok": true, "why": "", "harsh": true,
+			"do": func(ev: Array) -> Dictionary:
+				wf.end_war(war, "defender" if s == 1 else "attacker", day, ev)
+				return {"ok": true, "text": "投降了: " + _outcome(war, -s)}})
+	if m.realm != "" and world.realms.has(m.realm):
+		for rid in world.allies(m.realm):
+			if not world.realms.has(rid):
+				continue
+			var q := world.ruler(rid)
+			if wf.side(war, q.id) != 0 or q == other:
+				continue
+			var o: int = q.opinion_of(m).total
+			var need := 20 if s == 1 else -20
+			rows.append({"name": "叫%s来帮忙" % q.name, "icon": "rings", "desc": "%s是你的盟友 · 他对你好感 %+d (%s要 %+d 以上)" % [world.realm_name(rid), o, "进攻" if s == 1 else "防守", need],
+					"ok": true, "why": "", "harsh": false, "do": func(_ev: Array) -> Dictionary: return wf.call_ally(war, m, q)})
+	return rows
+
+
+## 宣战窗口: 能用的理由 (点两次就宣战)
+func _declare_rows(target: Person) -> Array:
+	var m := me()
+	var rows := []
+	if m == null:
+		return rows
+	var wf := world.warfare
+	var day := clock.day
+	for o in wf.cb_options(m, target):
+		var opt: Dictionary = o
+		rows.append({"name": "%s: %s" % [War.cb_name(opt.cb), opt.label], "icon": War.CB_ICONS.get(opt.cb, "swords"),
+				"desc": "花 %d 威望%s · %s" % [int(opt.cost), " (还在停战, 多花 %d, 大家都不高兴)" % int(War.TRUCE_BREAK) if opt.truce else "", War.CB_DESCS[opt.cb]],
+				"ok": opt.ok, "why": opt.why, "harsh": true, "target": target.id,
+				"do": func(ev: Array) -> Dictionary: return wf.declare(m, opt, day, ev)})
+	return rows
+
+
+## 能带兵的人 (军事好的在前)
+func _commander_rows(m: Person) -> Array:
+	var rows := []
+	for q in world.warfare.commander_candidates(m):
+		rows.append({"person": q, "martial": q.skill("martial", clock.day), "prowess": q.skill("prowess", clock.day)})
+	return rows
+
+
+## 右上角在打的仗: 每场一个小图标 (点了打开战争窗口)
+func _update_war_icons() -> void:
+	var list := world.warfare.wars_of(player_id) if player_id != "" else []
+	var key := ",".join(list.map(func(x: Dictionary) -> String: return str(x.id)))
+	if key != _war_key:
+		_war_key = key
+		for sp in _war_spots:
+			if _hover_spot == sp:
+				_hover_spot = null
+			sp.queue_free()
+		_war_spots.clear()
+		for i in list.size():
+			_spot(_war_icon_rect(i), "", _open_war.bind(int(list[i].id)), _war_spots)
+	for i in mini(list.size(), _war_spots.size()):
+		var war: Dictionary = list[i]
+		var wf := world.warfare
+		var sc := int(wf.score(war).total * wf.side(war, player_id))
+		_war_spots[i].tooltip_text = "%s\n%s: %s\n战争分数 %+d (你这边看)\n(点一下看这场仗)" % [_war_title(war), War.cb_name(war.cb), war.label, sc]
+
+
+func _war_icon_rect(i: int) -> Rect2:
+	var c := Vector2(WAR_ICON_X - i * WAR_ICON_GAP, 23)
+	return Rect2(c - Vector2(WAR_ICON_R, WAR_ICON_R), Vector2(WAR_ICON_R, WAR_ICON_R) * 2)
+
+
+# ---- 决议 (第 8 块; 左下角最右边的圆按钮) ----
+
+func _open_decisions() -> void:
+	if player_id == "":
+		toast("先选一个人来玩")
+		return
+	_open_window("decisions")
+
+
+# ---- 随机事件 (第 8 块): 正中间的窗口, 选一个办法 ----
+
+func _make_story_popup(data: Dictionary) -> void:
+	var st: Dictionary = data.story
+	for i in st.options.size():
+		_spot(story_option_rect(i, st.options.size()), world.story.tip_of(st, i), _pick_story.bind(i), _popup_spots)
+	if st.history != "":
+		_spot(STORY_BOOK, "历史背景\n" + st.history, Callable(), _popup_spots)
+	if st.face != "" and world.people.has(st.face):
+		var tex := TextureRect.new()
+		tex.texture = face(world.people[st.face])
+		tex.stretch_mode = TextureRect.STRETCH_SCALE
+		tex.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tex.position = STORY.position + Vector2(40, 120)
+		tex.size = Vector2(Portrait.W, Portrait.H)
+		_root.add_child(tex)
+		_popup_faces.append(tex)
+
+
+## 事件窗口下面第 i 个办法的按钮 (一共 n 个, 从下往上排)
+func story_option_rect(i: int, n: int) -> Rect2:
+	return Rect2(STORY.position.x + 60, STORY.end.y - 36 - (n - i) * 70, STORY.size.x - 120, 60)
+
+
+## 选了第 i 个办法: 照办, 关上窗口, 结果写在下面; 引出的事 (让位、去世……) 交给 main
+func _pick_story(i: int) -> void:
+	if popup.is_empty() or popup.kind != "story" or popup.get("done", false):
+		return
+	var st: Dictionary = popup.story
+	if not world.story.can_choose(st, i):
+		toast("钱不够: 要 %d 金币" % world.story.cost_of(st, i))
+		return
+	popup.done = true
+	var said: String = world.story.choose(st, i)
+	var ev: Array = st.ctx.events
+	close_popup()
+	if said != "":
+		notify(said)
+	if not ev.is_empty():
+		events_happened.emit(ev)
+	_dec_day = -1
+	refresh_person()
+	redraw()
+
+
+# ---- 阴谋 (第 7 块; 右边一列的「阴谋」按钮) ----
+
+func _open_schemes_window() -> void:
+	if player_id == "":
+		toast("先选一个人来玩")
+		return
+	_open_window("schemes")
+
+
+func _open_scheme(id: int) -> void:
+	if player_id != "":
+		_open_window("scheme", 0, {"scheme": id})
+
+
+## 阴谋窗口: 你的阴谋、有人在害你、你知道的秘密、你攥着的把柄、别人攥着你的
+func _schemes_rows(m: Person) -> Array:
+	var ig := world.intrigue
+	var rows := []
+	for sc in ig.schemes_of(m.id):
+		var sid: int = sc.id
+		var t: Person = world.people[sc.target]
+		var desc := ""
+		if sc.kind == "murder":
+			desc = "成功率 %d%% · 机会 %d/%d · 保密 %d%% · 走漏 %d/%d · 内应 %d 个" % [int(ig.success(sc).total), int(sc.advantages), Schemes.READY, int(ig.secrecy(sc)), int(sc.breaches), Schemes.MAX_BREACHES, sc.agents.size()]
+		else:
+			desc = "还要大约 %d 天 · 成的机会 %d%%" % [int(ig.phase_days(sc) - sc.progress), int(ig.sway_chance(sc))]
+		rows.append({"name": "%s%s" % [Schemes.scheme_name(sc.kind), t.name], "icon": Schemes.ICONS[sc.kind], "desc": desc + " · 点一下看",
+				"ok": true, "why": "", "harsh": false, "nav": true, "do": func(_ev: Array) -> Dictionary:
+					_open_scheme(sid)
+					return {"ok": true, "text": ""}})
+	for sc in ig.known_against(m.id):
+		var o: Person = world.people[sc.owner]
+		rows.append({"name": "%s在密谋暗杀你!" % o.name, "icon": "p_dagger", "desc": "%s · 点一下看他 (在你国家里的话可以照罪关他)" % (world.title_of(o) if world.title_of(o) != "" else o.culture_name()),
+				"ok": true, "why": "", "harsh": false, "nav": true, "do": func(_ev: Array) -> Dictionary:
+					show_person(o.id)
+					return {"ok": true, "text": ""}})
+	for pair in ig.secrets_known_by(m):
+		var q: Person = pair[0]
+		rows.append({"name": "秘密: " + ig.secret_text(q, pair[1]), "icon": "torch", "desc": "只有少数人知道 · 点一下看%s (互动里能揭发、勒索)" % q.name,
+				"ok": true, "why": "", "harsh": false, "nav": true, "do": func(_ev: Array) -> Dictionary:
+					show_person(q.id)
+					_open_actions()
+					return {"ok": true, "text": ""}})
+	for id in m.hooks:
+		if not world.people.has(id) or not world.people[id].alive:
+			continue
+		var q: Person = world.people[id]
+		var h: Dictionary = m.hooks[id]
+		rows.append({"name": "你攥着%s的把柄 (%s)" % [q.name, "强" if h.strong else "弱"], "icon": "decree",
+				"desc": ("现在能用" if ig.hook_ready(m, q, clock.day) else "五年内用过, 还不能再用") + " · 点一下看他",
+				"ok": true, "why": "", "harsh": false, "nav": true, "do": func(_ev: Array) -> Dictionary:
+					show_person(q.id)
+					return {"ok": true, "text": ""}})
+	for q in world.living.values():
+		if q.hooks.has(m.id) and q.hooks[m.id].get("strong", false):
+			rows.append({"name": "%s攥着你的把柄!" % q.name, "icon": "decree", "desc": "你不能对他宣战、不能关他; 他能逼你答应婚事、交出领地……",
+					"ok": false, "why": "没办法, 除非他死了", "harsh": false, "do": func(_ev: Array) -> Dictionary: return {"ok": false, "text": ""}})
+	if rows.is_empty():
+		rows.append({"name": "现在没有阴谋", "icon": "p_dagger", "desc": "打开别人的人物窗口, 在「互动」里开始暗杀、拉拢",
+				"ok": false, "why": "没有阴谋", "harsh": false, "do": func(_ev: Array) -> Dictionary: return {"ok": false, "text": ""}})
+	return rows
+
+
+## 一个阴谋: 动手、拉内应、不搞了
+func _scheme_rows(m: Person, id: int) -> Array:
+	var ig := world.intrigue
+	var sc: Dictionary = ig.schemes.get(id, {})
+	var rows := []
+	if sc.is_empty():
+		return rows
+	var day := clock.day
+	var t: Person = world.people[sc.target]
+	if sc.kind == "murder":
+		var ready := int(sc.advantages) >= Schemes.READY
+		rows.append({"name": "动手", "icon": "p_dagger",
+				"desc": "成功率 %d%%; 被人发现是你干的机会 %d%%" % [int(ig.success(sc).total), 100 if sc.revealed else int(100.0 - ig.secrecy(sc))],
+				"ok": ready, "why": "机会还没攒够 (%d/%d)" % [int(sc.advantages), Schemes.READY], "harsh": true,
+				"do": func(ev: Array) -> Dictionary: return ig.execute(sc, day, ev)})
+		var n: int = sc.agents.size()
+		rows.append({"name": "拉内应… (%d/%d)" % [n, Schemes.MAX_AGENTS], "icon": "council",
+				"desc": "从%s的家人、封臣、住在他那里的人里拉; 越亲近他的人加得越多" % t.name,
+				"ok": n < Schemes.MAX_AGENTS, "why": "内应满了", "harsh": false, "nav": true, "do": func(_ev: Array) -> Dictionary:
+					_open_window("agents", 0, {"scheme": int(sc.id)})
+					return {"ok": true, "text": ""}})
+	rows.append({"name": "不搞了", "icon": "banner", "desc": "取消这个阴谋 (攒的机会就没了)", "ok": true, "why": "", "harsh": true,
+			"do": func(_ev: Array) -> Dictionary: return ig.cancel(sc)})
+	return rows
+
+
+## 能拉来当内应的人
+func _agent_rows(m: Person, id: int) -> Array:
+	var ig := world.intrigue
+	var sc: Dictionary = ig.schemes.get(id, {})
+	var rows := []
+	if sc.is_empty():
+		return rows
+	var t: Person = world.people[sc.target]
+	for q in ig.agent_candidates(sc):
+		var pv := ig.invite_preview(sc, q, clock.day)
+		rows.append({"person": q, "value": ig.agent_value(q, t), "acc": ig.agent_accept(sc, q), "how": pv.how, "can": pv.ok, "close": ig.closeness(q, t)[0]})
+	return rows
+
+
+# ---- 正中间问你要不要 (盟友叫你帮忙、对方出钱求和) ----
+
+func _answer(yes: bool) -> void:
+	var cb: Callable = popup.get("on_yes" if yes else "on_no", Callable())
+	close_popup()
+	if cb.is_valid():
+		cb.call()
+	redraw()
 
 
 # ---- 你的国家: 直辖领地、公国头衔、封臣 (第 5 块; 右边一列的「领地」按钮) ----
@@ -1278,8 +1888,20 @@ func _choose_row(i: int) -> void:
 	var p: Person = world.people[window.person]
 	var row: Dictionary = window.rows[i]
 	match window.kind:
-		"actions":
+		"actions", "army", "war", "declare", "schemes", "scheme", "decisions":
 			_do_action(i)
+			return
+		"agents":
+			var sc: Dictionary = world.intrigue.schemes.get(int(window.get("scheme", -1)), {})
+			if not sc.is_empty():
+				toast(world.intrigue.invite(sc, row.person, clock.day).text)
+				_open_scheme(int(sc.id))
+			return
+		"commander":
+			var a := world.warfare.army_of(player_id)
+			if not a.is_empty():
+				toast(world.warfare.set_commander(a, row.person).text)
+			_open_window("army")
 			return
 		"realm":
 			_realm_click(row)
@@ -1461,7 +2083,7 @@ func _make_rules() -> void:
 
 
 func _rule_option(i: int, j: int) -> Rect2:
-	return Rect2(MENU_BOX.position.x + 30 + j * 215, MENU_BOX.position.y + 168 + i * 150, 205, 44)
+	return Rect2(MENU_BOX.position.x + 30 + j * 215, MENU_BOX.position.y + 168 + i * 125, 205, 44)
 
 
 func _pick_rule(id: String, value: String) -> void:
@@ -1582,6 +2204,7 @@ class Root:
 		if hud.player_id == "":
 			_banner()
 		_alert_row()
+		_war_row()
 		if hud.person_id != "":
 			_person_panel()
 		if hud.county:
@@ -1642,6 +2265,21 @@ class Root:
 			Look.round_button(self, c, ALERT_R, a.icon, a.color, a.kind == "domain", hot(r))
 			draw_circle(c + Vector2(ALERT_R * 0.75, -ALERT_R * 0.7), 10, Color("b0352b"))
 			Look.text_center(self, Rect2(c + Vector2(ALERT_R * 0.75 - 10, -ALERT_R * 0.7 - 10), Vector2(20, 20)), str(a.count), 13, Color.WHITE, "sans")
+
+	# ---- 右上角资源条左边: 在打的仗 (第 6 块) ----
+	func _war_row() -> void:
+		if hud.player_id == "":
+			return
+		var wf := hud.world.warfare
+		var list := wf.wars_of(hud.player_id)
+		for i in list.size():
+			var war: Dictionary = list[i]
+			var r := hud._war_icon_rect(i)
+			var c := r.get_center()
+			var sc: float = wf.score(war).total * wf.side(war, hud.player_id)
+			var col := Look.GREEN if sc > 0.5 else (Look.RED if sc < -0.5 else Look.TEXT)
+			Look.round_button(self, c, WAR_ICON_R, War.CB_ICONS.get(war.cb, "swords"), col, false, hot(r))
+			Look.text_center(self, Rect2(c.x - 26, c.y + 16, 52, 18), "%+d" % int(sc), 14, col, "sans")
 
 	# ---- 右边一列 ----
 	func _right_menu() -> void:
@@ -1832,8 +2470,8 @@ class Root:
 		var bar := Rect2(CHAR_STRESS.position + Vector2(80, 9), Vector2(300, 16))
 		draw_rect(bar, Color(0.12, 0.12, 0.13))
 		draw_rect(Rect2(bar.position, Vector2(bar.size.x * p.stress / Person.MAX_STRESS, bar.size.y)), Color("b0503a"))
-		for k in [1, 2]:
-			draw_line(bar.position + Vector2(bar.size.x * k / 3.0, 0), bar.position + Vector2(bar.size.x * k / 3.0, bar.size.y), Color(0, 0, 0, 0.6), 2.0)
+		for k in [1, 2, 3]:
+			draw_line(bar.position + Vector2(bar.size.x * k / 4.0, 0), bar.position + Vector2(bar.size.x * k / 4.0, bar.size.y), Color(0, 0, 0, 0.6), 2.0)
 		draw_rect(bar, Look.GOLD_DIM, false, 1.0)
 		Look.text(self, bar.position + Vector2(bar.size.x + 14, 15), "%d (第 %d 档)" % [int(p.stress), p.stress_level()], 17, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
 		# 性格特点
@@ -1950,6 +2588,45 @@ class Root:
 				title = ("我的国家: " + w.realm_name(p.realm)) if p.realm != "" else "我的领地: " + w.title_of(p)
 				sub = "直辖领地 %d 块 (上限 %d) · 每月 %+.1f 金币 · 兵 %d 人 · 封臣 %d 个%s" % [inc.domain, inc.limit, inc.gold, inc.levy, w.vassals_of(p).size(), (" · 暴政 %d" % int(p.tyranny)) if p.tyranny >= 1.0 else ""]
 				icon = "tower"
+			"army":
+				var lv := w.warfare.levy_of(p)
+				title = "军队"
+				sub = "能征 %d 人%s · 金钱 %d · 威望 %d。选中军队以后, 右键点地图上的地让它走过去" % [int(lv.levy), (" + 不用养的 %d" % int(lv.special)) if lv.special > 0.0 else "", int(p.gold), int(p.prestige)]
+				icon = "swords"
+			"war":
+				var war := w.warfare.war_by_id(int(win.get("war", -1)))
+				title = hud._war_title(war) if not war.is_empty() else "仗打完了"
+				if not war.is_empty():
+					sub = "理由: %s · %s · %d 年 %d 月开打, 打了 %d 个月" % [War.cb_name(war.cb), war.label, GameDate.from_day(int(war.start))[0], GameDate.from_day(int(war.start))[1], int(war.months)]
+				icon = "swords"
+			"declare":
+				title = "对%s宣战" % p.name
+				var mine: float = w.warfare.strength(hud.me())
+				var theirs: float = w.warfare.strength(p)
+				sub = "你能征 %d 人, 他能征 %d 人 (还没算盟友)。点一个理由, 再点一次就宣战 · 你有 %d 威望" % [int(mine), int(theirs), int(hud.me().prestige)]
+				icon = "swords"
+			"schemes":
+				title = "阴谋"
+				sub = "你在搞的阴谋、有人在害你、你知道的秘密、你攥着的把柄。暗杀、拉拢在别人人物窗口的「互动」里开始"
+				icon = "intrigue"
+			"scheme":
+				var sc: Dictionary = w.intrigue.schemes.get(int(win.get("scheme", -1)), {})
+				title = ("%s%s" % [Schemes.scheme_name(sc.kind), w.people[sc.target].name]) if not sc.is_empty() else "阴谋结束了"
+				sub = "%d 年 %d 月开始" % [GameDate.from_day(int(sc.start))[0], GameDate.from_day(int(sc.start))[1]] if not sc.is_empty() else ""
+				icon = "p_dagger"
+			"agents":
+				var sc2: Dictionary = w.intrigue.schemes.get(int(win.get("scheme", -1)), {})
+				title = "拉谁当内应"
+				sub = ("暗杀%s: 内应 %d/%d。点一个人拉他入伙 (他不肯的话送钱; 你攥着他的把柄就逼他)" % [w.people[sc2.target].name, sc2.agents.size(), Schemes.MAX_AGENTS]) if not sc2.is_empty() else ""
+				icon = "council"
+			"commander":
+				title = "谁来带兵"
+				sub = "带兵的人军事越高, 打仗优势越大; 武力高的打输了不容易被抓、战死。点一个人"
+				icon = "helmet"
+			"decisions":
+				title = "决议"
+				sub = "建立更高的头衔 (别人拿着就是篡夺)、当地特别的决议、排解压力的法子。灰的是还做不了的, 下面写着差什么; 要花钱的点两次"
+				icon = "decree"
 			"grant":
 				if win.has("county"):
 					title = "把%s封给谁" % w.by_id[win.county].name
@@ -1994,21 +2671,37 @@ class Root:
 			"grant":
 				Look.text(self, Vector2(x0 + 76, hy), "名字 · 是谁", 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
 				Look.text(self, Vector2(x0 + 382, hy), "本事: 外交 军事 管理 密谋 学识 武力", 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+			"commander":
+				Look.text(self, Vector2(x0 + 76, hy), "名字 · 跟你什么关系", 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+				Look.text(self, Vector2(x0 + 450, hy), "军事", 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+				Look.text(self, Vector2(x0 + 570, hy), "武力", 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+			"war":
+				_war_header(win)
+			"scheme":
+				_scheme_header(win)
+			"agents":
+				Look.text(self, Vector2(x0 + 76, hy), "名字 · 跟目标多亲", 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+				Look.text(self, Vector2(x0 + 450, hy), "加成功率", 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+				Look.text(self, Vector2(x0 + 600, hy), "肯不肯", 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
 		if win.rows.is_empty():
 			var none := {"match": "没有合适的人", "teacher": "没有能当老师的大人 (家里的大人都带满了 3 个学生)", "actions": "现在没有能对他做的事",
-					"realm": "你没有领地", "grant": "没有合适的人"}
+					"realm": "你没有领地", "grant": "没有合适的人", "declare": "没有宣战的理由", "commander": "没有能带兵的人", "war": "这场仗已经打完了",
+					"scheme": "这个阴谋已经结束了", "agents": "没有能拉的人", "schemes": "",
+					"decisions": "现在没有能做的决议 (控制了一个公国三成以上的地、或者有排解压力的毛病, 这里才会列出来)"}
 			Look.text_center(self, Rect2(r.position.x, hud._row_top() + 60, r.size.x, 40), none.get(kind, ""), 20, Look.TEXT_DIM, "sans")
-		var start: int = win.page * WIN_ROWS
-		for i in range(start, mini(start + WIN_ROWS, win.rows.size())):
+		var start: int = win.page * hud._win_rows()
+		var action_like: bool = kind in ["actions", "army", "war", "declare", "schemes", "scheme", "decisions"]
+		for i in range(start, mini(start + hud._win_rows(), win.rows.size())):
 			var row: Dictionary = win.rows[i]
 			var rr := hud._win_row_rect(i - start)
-			var chosen: bool = kind == "teacher" and p.guardian == row.person.id
-			var armed: bool = kind == "actions" and win.armed == i
-			var off: bool = kind == "actions" and not row.ok
+			var army: Dictionary = w.warfare.army_of(hud.player_id) if kind == "commander" else {}
+			var chosen: bool = (kind == "teacher" and p.guardian == row.person.id) or (kind == "commander" and not army.is_empty() and army.commander == row.person.id)
+			var armed: bool = action_like and win.armed == i
+			var off: bool = action_like and not row.ok
 			draw_rect(rr, Color(0.3, 0.1, 0.08) if armed else (Color(0.14, 0.2, 0.28) if chosen else (Color(0.13, 0.12, 0.1) if hot(rr) else Color(0.09, 0.095, 0.11))))
 			draw_rect(rr, Look.RED if armed else (Look.GOLD if hot(rr) or chosen else Color(Look.GOLD_DIM, 0.4)), false, 1.5)
 			match kind:
-				"actions":
+				"actions", "army", "war", "declare", "schemes", "scheme", "decisions":
 					Icons.draw(self, row.icon, rr.position + Vector2(38, 38), 40, Look.TEXT_DIM if off else Look.GOLD)
 					Look.text(self, rr.position + Vector2(76, 30), row.name + ("  (再点一次确定)" if armed else ""), 20, Look.RED if armed else (Look.TEXT_DIM if off else Look.TEXT), HORIZONTAL_ALIGNMENT_LEFT, rr.size.x - 90, "sans")
 					Look.text(self, rr.position + Vector2(76, 58), row.desc if row.ok else "做不了: " + row.why, 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, rr.size.x - 90, "sans")
@@ -2035,6 +2728,20 @@ class Root:
 							Look.text(self, rr.position + Vector2(384, 64), " · ".join(tags), 14, Look.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
 						var ok: bool = row.acc.total > 0
 						Look.text(self, rr.position + Vector2(676, 44), ("肯 %+d" if ok else "不肯 %+d") % row.acc.total, 21, Look.GREEN if ok else Look.RED, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+					elif kind == "agents":
+						Look.text(self, rr.position + Vector2(76, 58), row.close if row.close != "" else (w.title_of(c) if w.title_of(c) != "" else c.culture_name()), 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, 340, "sans")
+						Look.text(self, rr.position + Vector2(450, 46), "+%d" % int(row.value), 24, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+						Look.text(self, rr.position + Vector2(600, 46), row.how, 19, Look.GREEN if row.can else Look.RED, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+					elif kind == "commander":
+						var rel := w.relation(p, c)
+						var what := rel if rel != "" else (w.title_of(c) if w.title_of(c) != "" else w.house_name(c.house))
+						Look.text(self, rr.position + Vector2(76, 58), what, 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, 340, "sans")
+						Icons.skill_icon(self, "martial", rr.position + Vector2(450, 37), 40)
+						Look.text(self, rr.position + Vector2(480, 46), str(row.martial), 26, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+						Icons.skill_icon(self, "prowess", rr.position + Vector2(570, 37), 40)
+						Look.text(self, rr.position + Vector2(600, 46), str(row.prowess), 26, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+						if chosen:
+							Look.text(self, rr.position + Vector2(670, 46), "现在带兵", 16, Look.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
 					elif kind == "teacher":
 						var rel := w.relation(p, c)
 						Look.text(self, rr.position + Vector2(76, 58), (rel + " · " if rel != "" else "") + c.culture_name(), 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, 340, "sans")
@@ -2048,6 +2755,84 @@ class Root:
 				var br := Rect2(r.position.x + 20, r.end.y - 62, 200, 46) if k == 0 else Rect2(r.end.x - 220, r.end.y - 62, 200, 46)
 				_wide_button(br, "上一页" if k == 0 else "下一页", false)
 			Look.text_center(self, Rect2(r.position.x, r.end.y - 62, r.size.x, 46), "第 %d / %d 页 (一共 %d 个)" % [win.page + 1, hud._win_pages(), win.rows.size()], 17, Look.TEXT_DIM, "sans")
+
+	## 战争窗口上半: 战争分数 (你这边看)、分数怎么来的、两边都有谁
+	func _war_header(win: Dictionary) -> void:
+		var w := hud.world
+		var wf := w.warfare
+		var war := wf.war_by_id(int(win.get("war", -1)))
+		if war.is_empty():
+			return
+		var r := WINDOW
+		var s := wf.side(war, hud.player_id)
+		var sc := wf.score(war)
+		var total: float = sc.total * s
+		var bar := Rect2(r.position.x + 40, r.position.y + 112, r.size.x - 80, 22)
+		draw_rect(bar, Color(0.12, 0.12, 0.13))
+		var mid := bar.get_center().x
+		var half := bar.size.x / 2.0
+		if total > 0.0:
+			draw_rect(Rect2(mid, bar.position.y, half * total / 100.0, bar.size.y), Look.GREEN)
+		elif total < 0.0:
+			draw_rect(Rect2(mid + half * total / 100.0, bar.position.y, -half * total / 100.0, bar.size.y), Look.RED)
+		draw_line(Vector2(mid, bar.position.y - 4), Vector2(mid, bar.end.y + 4), Look.GOLD, 2.0)
+		draw_rect(bar, Look.GOLD_DIM, false, 1.5)
+		Look.text_center(self, Rect2(r.position.x, bar.end.y + 4, r.size.x, 30), "战争分数 %+d (你这边看; 到 100 能逼对方答应, 到 -100 对方能逼你)" % int(total), 17, Look.TEXT, "sans")
+		var y := bar.end.y + 56
+		if sc.parts.is_empty():
+			Look.text(self, Vector2(r.position.x + 40, y), "还没分出高下", 16, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+		for i in mini(5, sc.parts.size()):
+			var part: Array = sc.parts[i]
+			var v: float = part[1] * s
+			Look.text(self, Vector2(r.position.x + 40, y + i * 24), part[0], 16, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, 420, "sans")
+			Look.text(self, Vector2(r.position.x + 470, y + i * 24), "%+d" % int(v), 16, Look.GREEN if v > 0 else Look.RED, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+		# 两边
+		var cols := [[1 if s == 1 else -1, "你这边"], [-1 if s == 1 else 1, "对方"]]
+		for k in 2:
+			var x: float = r.position.x + 40 + k * 390
+			var side: int = cols[k][0]
+			Look.text(self, Vector2(x, r.position.y + 318), cols[k][1], 18, Look.GOLD)
+			var people: Array = war.attackers if side == 1 else war.defenders
+			for j in mini(3, people.size()):
+				var pid: String = people[j]
+				var a := wf.army_of(pid)
+				var line := "%s%s" % [hud._side_name(pid), (" · 军队 %d 人" % int(wf.soldiers(a))) if not a.is_empty() else " · 没征兵"]
+				Look.text(self, Vector2(x, r.position.y + 344 + j * 22), line, 15, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, 370, "sans")
+		draw_line(Vector2(r.position.x + 30, r.position.y + 416), Vector2(r.end.x - 30, r.position.y + 416), Color(Look.GOLD_DIM, 0.5), 1.0)
+
+	## 阴谋窗口上半: 成功率、机会、保密、走漏、内应
+	func _scheme_header(win: Dictionary) -> void:
+		var w := hud.world
+		var ig := w.intrigue
+		var sc: Dictionary = ig.schemes.get(int(win.get("scheme", -1)), {})
+		if sc.is_empty():
+			return
+		var r := WINDOW
+		var x := r.position.x + 40
+		var y := r.position.y + 120
+		if sc.kind == "sway":
+			Look.text(self, Vector2(x, y + 10), "成的机会 %d%% · 还要大约 %d 天" % [int(ig.sway_chance(sc)), int(ig.phase_days(sc) - sc.progress)], 22, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+			Look.text(self, Vector2(x, y + 44), "外交越高越快、越容易成; 对身份比你高的人难一些", 16, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+			return
+		var su := ig.success(sc)
+		var pot := ig.potential(sc)
+		_bar(Rect2(x, y, 360, 20), su.total / 100.0, Look.GREEN, "成功率 %d%% (最高 %d%%)" % [int(su.total), int(pot.total)])
+		_bar(Rect2(x, y + 50, 360, 20), minf(1.0, int(sc.advantages) / float(Schemes.READY)), Look.GOLD,
+				("机会 %d/%d · 能动手了" % [int(sc.advantages), Schemes.READY]) if int(sc.advantages) >= Schemes.READY else
+				"机会 %d/%d · 每 %d 天一次, 再过 %d 天" % [int(sc.advantages), Schemes.READY, int(ig.phase_days(sc)), int(ig.phase_days(sc) - sc.progress)])
+		var sec := ig.secrecy(sc)
+		_bar(Rect2(x, y + 100, 360, 20), sec / 100.0, Color("7fa0c8"), "保密 %d%%%s" % [int(sec), " · 他已经知道是你了!" if sc.revealed else ""])
+		_bar(Rect2(x, y + 150, 360, 20), int(sc.breaches) / float(Schemes.MAX_BREACHES), Look.RED, "走漏 %d/%d · 满了就失败" % [int(sc.breaches), Schemes.MAX_BREACHES])
+		Look.text(self, Vector2(x, y + 190), "开头 6 个月不会走漏; 之后保密越差, 越容易走漏。鼠标指着「动手」看被发现的机会", 15, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 80, "sans")
+		var names: Array = sc.agents.filter(func(id: String) -> bool: return w.people.has(id)).map(func(id: String) -> String: return w.people[id].name)
+		Look.text(self, Vector2(x, y + 236), "内应: " + ("、".join(names) if not names.is_empty() else "还没有"), 17, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 80, "sans")
+		draw_line(Vector2(r.position.x + 30, r.position.y + 396), Vector2(r.end.x - 30, r.position.y + 396), Color(Look.GOLD_DIM, 0.5), 1.0)
+
+	func _bar(rect: Rect2, frac: float, col: Color, label: String) -> void:
+		draw_rect(rect, Color(0.12, 0.12, 0.13))
+		draw_rect(Rect2(rect.position, Vector2(rect.size.x * clampf(frac, 0.0, 1.0), rect.size.y)), col)
+		draw_rect(rect, Look.GOLD_DIM, false, 1.5)
+		Look.text(self, rect.position + Vector2(rect.size.x + 14, 16), label, 16, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, 380, "sans")
 
 	## 「我的国家」窗口里的一行
 	func _realm_row(rr: Rect2, row: Dictionary) -> void:
@@ -2116,7 +2901,16 @@ class Root:
 		y = 410.0
 		draw_line(Vector2(30, y - 30), Vector2(r.size.x - 30, y - 30), Color(Look.GOLD_DIM, 0.5), 1.0)
 		Look.text(self, Vector2(40, y), "这块领地", 20, Look.GOLD)
-		Look.text(self, Vector2(40, y + 34), "面积: %d 平方公里%s" % [c.area_km2, " · 靠海" if c.coastal else " · 不靠海"], 19, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+		var wf := w.warfare
+		Look.text(self, Vector2(40, y + 34), "面积: %d 平方公里%s · 城墙 %d 级 (守军 %d/%d)" % [c.area_km2, " · 靠海" if c.coastal else " · 不靠海", wf.fort(c), int(c.garrison), int(wf.max_garrison(c))], 19, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+		var war_line := ""
+		if c.occupier != "" and w.people.has(c.occupier):
+			war_line = "被%s占领了 (不出钱、不出兵)" % hud._side_name(c.occupier)
+		if wf.sieges.has(c.id):
+			var sg: Dictionary = wf.sieges[c.id]
+			war_line += ("; " if war_line != "" else "") + "正在被%s围城: %d%%" % [hud._side_name(sg.by), int(100.0 * sg.progress / wf.siege_needed(c))]
+		if war_line != "":
+			Look.text(self, Vector2(40, 552), war_line, 18, Look.RED, HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 80, "sans")
 		var names := []
 		for n in c.neighbors:
 			names.append(w.by_id[n].name)
@@ -2154,7 +2948,7 @@ class Root:
 
 	# ---- 操作说明 ----
 	func _help() -> void:
-		var r := Rect2(560, 110, 800, 760)
+		var r := Rect2(560, 90, 800, 820)
 		Look.panel(self, r)
 		Look.text_center(self, Rect2(r.position.x, r.position.y + 14, r.size.x, 44), "操作说明", 30, Look.GOLD)
 		var lines := [
@@ -2166,28 +2960,52 @@ class Root:
 			"左下角盾牌: 看你的国家      Esc: 关窗口      F1: 这个说明",
 			"",
 			"点左下角的头像: 看你玩的这个人 (人物窗口)",
-			"人物窗口下面的按钮: 说亲、教育 (请老师)、互动 (送礼、收回领地、关大牢)",
-			"右边一列第一个「领地」: 你的直辖领地、封臣, 把领地封出去",
+			"人物窗口下面的按钮: 说亲、教育 (请老师)、互动 (送礼、收回领地、关大牢、宣战)",
+			"右边一列第一个「领地」: 你的直辖领地、封臣, 把领地封出去; 第二个「军队」: 征兵、解散",
+			"点地图上自己的军队选中它, 再右键点一块地, 军队就走过去 (隔海会坐船)",
+			"右边一列第五个「阴谋」: 暗杀、拉拢、秘密、把柄; 在别人的「互动」里开始",
 			"右下角「≡」: 存档、读档、退出; 开局前横幅下面的「开局设置」",
 			"上方正中的小图标是提醒 (孩子没老师、有人该结婚了……), 点了直接去办",
-			"做好了第 1–5 块: 地图和时间、人物、家族和继承、结婚生子、封臣;",
-			"打仗、阴谋这些还没有, 点那些按钮会提示「以后才有」。",
+			"左下角最右边「决议」: 建立公国、王国 (别人拿着就是篡夺)、排解压力; 正中间弹出的事件选一个办法",
+			"做好了第 1–8 块 (第一阶段); 议会、宫廷这些还没有, 点那些按钮会提示「以后才有」。",
 		]
 		for i in lines.size():
-			Look.text(self, Vector2(r.position.x + 40, r.position.y + 100 + i * 46), lines[i], 20, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 80, "sans")
+			Look.text(self, Vector2(r.position.x + 40, r.position.y + 96 + i * 44), lines[i], 19, Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 80, "sans")
 
 	# ---- 鼠标指着地图上的领地 ----
 	func _map_tooltip() -> void:
-		if hud.hover_index == 0 or hud._hover_spot != null:
+		if hud._hover_spot != null:
 			return
 		var w := hud.world
-		var c := w.county_at(hud.hover_index)
+		var wf := w.warfare
 		var m := get_local_mouse_position()
-		var lord: Person = w.people[c.lord]
-		var lines := [c.name, "%s %s" % [w.title_of(lord), lord.name]]
-		var liege := w.liege_of(lord)
-		if liege != null:
-			lines.append("(%s %s的封臣)" % [w.title_of(liege), liege.name])
+		var lines := []
+		var ha: Dictionary = wf.armies.get(hud.map.hovered_army, {})
+		if not ha.is_empty():
+			var owner: Person = w.people[ha.owner]
+			var cm: Person = w.people.get(ha.commander)
+			lines = ["%s的军队: %d 人" % [hud._side_name(owner.id), int(wf.soldiers(ha))], hud._army_status(ha),
+					"带兵: %s" % (("%s (军事 %d)" % [cm.name, cm.skill("martial", hud.clock.day)]) if cm != null else "没有")]
+			if ha.owner == hud.player_id:
+				lines.append("点一下选中, 再右键点一块地让它走过去")
+		elif hud.hover_index == 0:
+			return
+		else:
+			var c := w.county_at(hud.hover_index)
+			var lord: Person = w.people[c.lord]
+			lines = [c.name, "%s %s" % [w.title_of(lord), lord.name]]
+			var liege := w.liege_of(lord)
+			if liege != null:
+				lines.append("(%s %s的封臣)" % [w.title_of(liege), liege.name])
+			if c.occupier != "" and w.people.has(c.occupier):
+				lines.append("被%s占领了" % hud._side_name(c.occupier))
+			if wf.sieges.has(c.id):
+				lines.append("正在被围城: %d%%" % int(100.0 * wf.sieges[c.id].progress / wf.siege_needed(c)))
+			if hud.map.selected_army >= 0 and wf.armies.has(hud.map.selected_army):
+				var sa: Dictionary = wf.armies[hud.map.selected_army]
+				var d := wf.days_between(sa.loc, c.id)
+				if d < INF and c.id != sa.loc:
+					lines.append("右键: 军队走过去, 要 %d 天" % ceili(d))
 		var r := Rect2(m + Vector2(22, 18), Vector2(340, 74 + (lines.size() - 2) * 24))
 		if r.end.x > 1900:
 			r.position.x = m.x - 22 - r.size.x
@@ -2223,6 +3041,12 @@ class Root:
 		if hud.popup.kind == "rules":
 			_rules_popup()
 			return
+		if hud.popup.kind in ["info", "ask"]:
+			_info_popup()
+			return
+		if hud.popup.kind == "story":
+			_story_popup()
+			return
 		var w := hud.world
 		var e: Dictionary = hud.popup.event
 		var dead: Person = w.people[e.dead]
@@ -2232,7 +3056,8 @@ class Root:
 		draw_rect(Rect2(r.position, Vector2(r.size.x, 84)), Color(0.25, 0.12, 0.1, 0.6))
 		var kind: String = hud.popup.kind
 		var over: bool = kind in ["game_over", "vassal_over"]
-		var head := "%s去世了" % dead.name
+		var abdicated: bool = e.get("abdicated", false)
+		var head := ("%s让位了" if abdicated else "%s去世了") % dead.name
 		if kind == "game_over":
 			head = "你的家族绝嗣了"
 		elif kind == "vassal_over":
@@ -2251,7 +3076,7 @@ class Root:
 			lines.append("游戏结束。你可以换一个人接着玩。" if w.rules.ironman != "on" else "游戏结束 (铁人模式)。")
 		elif kind == "vassal_succession":
 			var rel2 := w.relation(dead, heir)
-			lines.append("享年 %d 岁。" % dead.age(e.day))
+			lines.append(("撑不住了, %d 岁让出了领地。" if abdicated else "享年 %d 岁。") % dead.age(e.day))
 			lines.append("照%s, 由他的%s%s继承领地。" % [law, rel2 if rel2 != "" else "族人", heir.name])
 			lines.append("你现在是%s %s (%d 岁)。" % [w.title_of(heir), heir.name, heir.age(e.day)])
 		elif over:
@@ -2261,7 +3086,7 @@ class Root:
 			lines.append("游戏结束。你可以换一个人接着玩。" if w.rules.ironman != "on" else "游戏结束 (铁人模式)。")
 		else:
 			var rel := w.relation(dead, heir)
-			lines.append("享年 %d 岁。" % dead.age(e.day))
+			lines.append(("撑不住了, %d 岁让出了王位。" if abdicated else "享年 %d 岁。") % dead.age(e.day))
 			lines.append("照%s, 由他的%s%s继承%s。" % [law, rel if rel != "" else "族人", heir.name, e.realm_name])
 			for sp in e.splits:
 				var son: Person = w.people[sp[1]]
@@ -2274,6 +3099,72 @@ class Root:
 		var iron_over: bool = over and w.rules.ironman == "on"
 		_wide_button(POPUP_BUTTON, "开一局新游戏" if iron_over else ("换一个人接着玩" if over else "继续"), true)
 
+	# ---- 正中间的窗口: 告诉你一件事 / 问你要不要 (第 6 块: 有人向你宣战、仗打完了、盟友叫你、对方出钱求和) ----
+	func _info_popup() -> void:
+		var pop := hud.popup
+		var r := POPUP
+		Look.panel(self, r, Color(0.07, 0.075, 0.09, 1.0))
+		draw_rect(Rect2(r.position, Vector2(r.size.x, 84)), Color(0.25, 0.12, 0.1, 0.6) if pop.get("bad", false) else Color(0.14, 0.17, 0.2, 0.7))
+		Icons.draw(self, pop.get("icon", "swords"), r.position + Vector2(60, 42), 50, Look.GOLD)
+		Look.text_center(self, Rect2(r.position.x + 90, r.position.y + 14, r.size.x - 180, 56), pop.title, 32, Look.GOLD)
+		var lines: Array = pop.get("lines", [])
+		for i in lines.size():
+			Look.text_center(self, Rect2(r.position.x + 40, r.position.y + 120 + i * 40, r.size.x - 80, 34), lines[i], 19, Look.TEXT, "sans")
+		if pop.kind == "ask":
+			_wide_button(ASK_BUTTONS[0], pop.get("yes", "好"), true)
+			_wide_button(ASK_BUTTONS[1], pop.get("no", "不"), false)
+		else:
+			_wide_button(POPUP_BUTTON, "换一个人接着玩" if pop.get("over", false) and hud.world.rules.ironman != "on" else ("开一局新游戏" if pop.get("over", false) else "知道了"), true)
+
+	# ---- 正中间的窗口: 随机事件 (第 8 块) ----
+	func _story_popup() -> void:
+		var w := hud.world
+		var st: Dictionary = hud.popup.story
+		var r := STORY
+		var me: Person = st.ctx.me
+		Look.panel(self, r, Color(0.07, 0.075, 0.09, 1.0))
+		var breakdown := String(st.id).begins_with("break")
+		draw_rect(Rect2(r.position, Vector2(r.size.x, 84)), Color(0.25, 0.12, 0.1, 0.6) if breakdown else Color(0.16, 0.14, 0.1, 0.75))
+		var cat := ""
+		for d in StoryEvents.defs():
+			if d.id == st.id:
+				cat = d.cat
+		Icons.draw(self, "candle" if breakdown else STORY_ICONS.get(cat, "decree"), r.position + Vector2(60, 42), 48, Look.GOLD)
+		Look.text_center(self, Rect2(r.position.x + 100, r.position.y + 14, r.size.x - 200, 56), st.title, 34, Look.GOLD)
+		if st.history != "":
+			Icons.draw(self, "book", STORY_BOOK.get_center(), 44, Look.GOLD if hot(STORY_BOOK) else Look.GOLD_DIM)
+			Look.text_center(self, Rect2(STORY_BOOK.position.x - 40, STORY_BOOK.end.y - 2, STORY_BOOK.size.x + 80, 22), "历史背景", 14, Look.TEXT_DIM, "sans")
+		var x := r.position.x + 40
+		var tw := r.size.x - 80
+		if st.face != "" and w.people.has(st.face):
+			var fr := Rect2(r.position + Vector2(40, 120), Vector2(Portrait.W, Portrait.H))
+			draw_rect(fr.grow(2), Look.GOLD_DIM, false, 2.0)
+			var who: Person = w.people[st.face]
+			Look.text_center(self, Rect2(fr.position.x - 30, fr.end.y + 6, fr.size.x + 60, 24), who.name, 18, Look.TEXT, "sans")
+			x = fr.end.x + 36
+			tw = r.end.x - 40 - x
+		var f := Look.font("sans")
+		draw_multiline_string(f, Vector2(x, r.position.y + 150), st.text, HORIZONTAL_ALIGNMENT_LEFT, tw, 22, 12, Look.TEXT)
+		var n: int = st.options.size()
+		Look.text(self, Vector2(r.position.x + 60, hud.story_option_rect(0, n).position.y - 16), "你怎么办? (鼠标指着看后果; 也可以按数字键 1～%d)" % n, 16, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+		for i in n:
+			var br := hud.story_option_rect(i, n)
+			var o: Dictionary = st.options[i]
+			var ok: bool = w.story.can_choose(st, i)
+			var on := hot(br) and ok
+			draw_rect(br, Color(0.2, 0.17, 0.11) if on else Color(0.11, 0.115, 0.13))
+			draw_rect(br, Look.GOLD if on else (Look.GOLD_DIM if ok else Color(Look.GOLD_DIM, 0.35)), false, 2.0)
+			Look.text(self, br.position + Vector2(20, 38), "%d. %s" % [i + 1, w.story.label_of(st, i)], 21, Look.TEXT if ok else Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, br.size.x - 200, "sans")
+			if not ok:
+				Look.text(self, Vector2(br.end.x - 170, br.position.y + 38), "钱不够", 18, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_RIGHT, 150, "sans")
+				continue
+			var sv := 0.0
+			for t in o.get("stress", {}):
+				if me.has_trait(t):
+					sv += float(o.stress[t])
+			if sv != 0.0:
+				Look.text(self, Vector2(br.end.x - 170, br.position.y + 38), "压力 %+d" % int(sv), 18, Look.RED if sv > 0 else Look.GREEN, HORIZONTAL_ALIGNMENT_RIGHT, 150, "sans")
+
 	# ---- 正中间的窗口: 开局设置 ----
 	func _rules_popup() -> void:
 		var r := MENU_BOX
@@ -2285,7 +3176,7 @@ class Root:
 				"选好了再选人开始; 开始以后不能改" if editable else "游戏开始以后不能改, 只能看", 16, Look.TEXT_DIM, "sans")
 		for i in Rules.LIST.size():
 			var rule: Array = Rules.LIST[i]
-			var y: float = r.position.y + 120 + i * 150
+			var y: float = r.position.y + 120 + i * 125
 			Look.text(self, Vector2(r.position.x + 30, y + 22), rule[1], 22, Look.GOLD)
 			Look.text(self, Vector2(r.position.x + 30, y + 44), rule[2], 14, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 60, "sans")
 			for j in rule[3].size():

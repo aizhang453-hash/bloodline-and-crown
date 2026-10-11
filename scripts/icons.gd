@@ -168,6 +168,8 @@ const BADGE := {
 	"bad": [Color("4a2424"), Color("c06a5a")],
 	"education": [Color("24344a"), Color("7fa0c8")],
 	"childhood": [Color("2e4040"), Color("8cc0b0")],
+	"coping": [Color("362e44"), Color("9a86b8")],   # 排解压力的毛病 (第 8 块)
+	"stress": [Color("40222e"), Color("b0607a")],   # 崩溃得重了才有的 (忧郁、疯癫)
 	"skill": [Color("2a2c33"), Color("8a7a5a")],
 }
 const SKILL_ICONS := {
@@ -184,7 +186,7 @@ static func trait_icon(ci: CanvasItem, what: Variant, c: Vector2, size: float) -
 		_pips(ci, c, size, int(what.level), Color("a8c8f0"))
 		return
 	var info := Traits.get_trait(what)
-	if info.get("kind", "") in ["personality", "childhood"]:
+	if info.get("kind", "") in ["personality", "childhood", "coping", "stress"]:
 		_badge(ci, info.kind, c, size)
 		draw(ci, "p_" + String(what), c, size * 0.72, INK)
 		return
@@ -495,6 +497,77 @@ static func _pictogram(ci: CanvasItem, name: String, t: Transform2D, col: Color)
 				var a := PI * 0.15 + PI * 0.7 * k / 4.0
 				_ellipse(ci, t, Vector2(0.2, -0.16) + Vector2(cos(a), sin(a)) * 0.13, Vector2(0.07, 0.11), Color("9a8aa0"))
 			_circle(ci, t, Vector2(0.2, -0.16), 0.06, Color("6a6058"))
+		# ---- 排解压力的毛病、崩溃后的特点 (第 8 块) ----
+		"p_drunkard":  # 酗酒: 冒着泡沫往外淌的木头酒杯
+			_poly(ci, t, [Vector2(-0.24, -0.18), Vector2(0.16, -0.18), Vector2(0.13, 0.42), Vector2(-0.21, 0.42)], Color("8a5a32"))
+			for y in [-0.04, 0.26]:
+				_line(ci, t, Vector2(-0.23, y), Vector2(0.15, y), Color("4a3020"), 0.04)
+			ci.draw_arc(t * Vector2(0.18, 0.1), 0.13 * t.get_scale().x, -PI / 2, PI / 2, 12, Color("8a5a32"), maxf(1.5, t.get_scale().x * 0.06), true)
+			for v in [Vector2(-0.18, -0.22), Vector2(-0.04, -0.27), Vector2(0.1, -0.22), Vector2(0.2, -0.14)]:
+				_circle(ci, t, v, 0.09, Color("f4ecd8"))
+			_ellipse(ci, t, Vector2(0.27, 0.0), Vector2(0.035, 0.06), Color("d8a840"))
+			_ellipse(ci, t, Vector2(0.33, 0.2), Vector2(0.03, 0.05), Color("d8a840"))
+		"p_flagellant":  # 苦修: 打自己的鞭子 (木柄、三根打结的绳子)
+			_line(ci, t, Vector2(-0.36, 0.42), Vector2(-0.06, 0.04), WOOD, 0.1)
+			for end in [Vector2(0.26, -0.4), Vector2(0.38, -0.12), Vector2(0.3, 0.16)]:
+				var mid: Vector2 = (Vector2(-0.06, 0.04) + end) / 2.0 + Vector2(0.04, 0.04)
+				_line(ci, t, Vector2(-0.06, 0.04), mid, Color("c8b088"), 0.035)
+				_line(ci, t, mid, end, Color("c8b088"), 0.035)
+				_circle(ci, t, mid, 0.035, Color("8a6a48"))
+				_circle(ci, t, end, 0.045, Color("8a6a48"))
+		"p_comfort_eater":  # 暴饮暴食: 一大个圆面包和一块奶酪
+			_half_ellipse(ci, t, Vector2(-0.06, 0.2), Vector2(0.36, 0.42), Color("c08a4a"))
+			for x in [-0.2, -0.04, 0.12]:
+				_line(ci, t, Vector2(x - 0.04, -0.08), Vector2(x + 0.06, 0.06), Color("8a5a2a"), 0.04)
+			_poly(ci, t, [Vector2(0.06, 0.44), Vector2(0.44, 0.44), Vector2(0.44, 0.2)], Color("f0c850"))
+			_circle(ci, t, Vector2(0.32, 0.38), 0.03, Color("c89a30"))
+		"p_inappetetic":  # 茶饭不思: 空碗, 勺子搁在旁边
+			_poly(ci, t, [Vector2(-0.38, 0.0), Vector2(0.38, 0.0), Vector2(0.26, 0.26), Vector2(0.1, 0.34), Vector2(-0.1, 0.34), Vector2(-0.26, 0.26)], Color("9a6a40"))
+			_ellipse(ci, t, Vector2(0, 0.0), Vector2(0.38, 0.08), Color("4a3020"))
+			_line(ci, t, Vector2(-0.1, -0.22), Vector2(0.42, -0.38), Color("b8b0a0"), 0.04)
+			_ellipse(ci, t, Vector2(-0.16, -0.2), Vector2(0.09, 0.05), Color("b8b0a0"))
+		"p_reclusive":  # 闭门不出: 关上的拱门, 横着一根门闩
+			_arch(ci, t, Vector2(0, 0.46), 0.3, 0.9, WOOD)
+			for x in [-0.1, 0.1]:
+				_line(ci, t, Vector2(x, -0.3), Vector2(x, 0.46), Color("4a3020"), 0.03)
+			_line(ci, t, Vector2(-0.36, 0.08), Vector2(0.36, 0.08), Color("5a5a60"), 0.09)
+			ci.draw_arc(t * Vector2(0.17, -0.06), 0.06 * t.get_scale().x, 0, TAU, 12, Color("c8c8d0"), maxf(1.0, t.get_scale().x * 0.03), true)
+		"p_profligate":  # 乱花钱: 钱币撒得到处都是
+			for v in [Vector2(-0.26, 0.28), Vector2(0.0, 0.32), Vector2(0.24, 0.22), Vector2(-0.12, 0.0), Vector2(0.16, -0.08), Vector2(-0.26, -0.26), Vector2(0.08, -0.36)]:
+				_circle(ci, t, v, 0.1, GOLD)
+				_circle(ci, t, v, 0.045, Color("b8902a"))
+			_line(ci, t, Vector2(0.28, -0.3), Vector2(0.42, -0.42), Color(INK, 0.7), 0.03)
+			_line(ci, t, Vector2(-0.38, -0.12), Vector2(-0.46, -0.04), Color(INK, 0.7), 0.03)
+		"p_journaller":  # 写日记: 打开的本子和一支羽毛笔
+			_poly(ci, t, [Vector2(-0.42, -0.2), Vector2(0.0, -0.14), Vector2(0.0, 0.36), Vector2(-0.42, 0.3)], PARCHMENT)
+			_poly(ci, t, [Vector2(0.0, -0.14), Vector2(0.42, -0.2), Vector2(0.42, 0.3), Vector2(0.0, 0.36)], PARCHMENT.darkened(0.08))
+			for k in 4:
+				_line(ci, t, Vector2(-0.34, -0.08 + k * 0.09), Vector2(-0.08, -0.05 + k * 0.09), Color("6a5a48"), 0.02)
+			_poly(ci, t, [Vector2(0.1, 0.18), Vector2(0.44, -0.42), Vector2(0.3, -0.12)], Color("f4f0e6"))
+			_line(ci, t, Vector2(0.1, 0.18), Vector2(0.06, 0.26), Color("2a2622"), 0.03)
+		"p_confider":  # 找人倾诉: 两个人凑在一起说话
+			_figure(ci, t, Vector2(-0.18, 0.46), 0.78, col)
+			_figure(ci, t, Vector2(0.2, 0.46), 0.7, Color(col, 0.65))
+			for k in 3:
+				_circle(ci, t, Vector2(-0.02 + k * 0.08, -0.42 + k * 0.03), 0.025, Color("c8b0e0"))
+		"p_athletic":  # 拼命练武: 两把交叉的木头练习剑
+			_line(ci, t, Vector2(-0.36, 0.4), Vector2(0.32, -0.38), Color("c89a68"), 0.09)
+			_line(ci, t, Vector2(0.36, 0.4), Vector2(-0.32, -0.38), Color("b08050"), 0.09)
+			_line(ci, t, Vector2(-0.3, 0.16), Vector2(-0.12, 0.32), Color("6a4a2a"), 0.07)
+			_line(ci, t, Vector2(0.3, 0.16), Vector2(0.12, 0.32), Color("6a4a2a"), 0.07)
+		"p_melancholic":  # 忧郁: 下雨的乌云
+			for v in [Vector2(-0.2, -0.1), Vector2(0.06, -0.2), Vector2(0.24, -0.08), Vector2(-0.02, -0.02)]:
+				_circle(ci, t, v, 0.17, Color("8a909a"))
+			for v in [Vector2(-0.2, 0.2), Vector2(0.0, 0.32), Vector2(0.2, 0.22), Vector2(-0.1, 0.42), Vector2(0.12, 0.44)]:
+				_ellipse(ci, t, v, Vector2(0.03, 0.06), Color("7aa0d0"))
+		"p_lunatic":  # 疯癫: 月牙 (英语「疯」这个词就是从月亮来的) 和一圈乱转的线
+			_circle(ci, t, Vector2(-0.08, -0.04), 0.3, Color("e8d890"))
+			ci.draw_circle(t * Vector2(0.06, -0.12), 0.27 * t.get_scale().x, BADGE.stress[0])
+			var sp := PackedVector2Array()
+			for k in 40:
+				var a := k * 0.45
+				sp.append(t * (Vector2(0.26, 0.26) + Vector2(cos(a), sin(a)) * (0.01 + k * 0.004)))
+			ci.draw_polyline(sp, Color("c8a0e0"), maxf(1.0, t.get_scale().x * 0.03), true)
 		"p_round_shield":  # 圆盾 (武力)
 			_circle(ci, t, Vector2.ZERO, 0.42, Color("8a5a3a"))
 			for k in 6:

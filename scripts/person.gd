@@ -8,7 +8,8 @@ extends RefCounted
 
 const ADULT := 16
 const STRESS_PER_LEVEL := 100.0
-const MAX_STRESS := 300.0
+const MAX_STRESS := 400.0     # 照三代: 0–400, 100 一档, 第 3 档是 300 以上 (第 8 块从 300 改成 400)
+const COPING_DECAY := 0.2     # 每个排解压力的毛病让压力降得快 20% (照三代)
 const STRESS_DECAY := 15.0  # 每年自己降多少 (冷静的人降两倍)
 const CULTURE_NAMES := {
 	"anglo_saxon": "盎格鲁-撒克逊人", "norse": "诺斯人", "norse_gael": "诺斯-盖尔人", "gaelic": "盖尔人",
@@ -61,6 +62,17 @@ var house := ""               # 家族 id (空 = 家族不详)
 var alive := true
 var death_day := -1           # 哪天死的
 var prestige := 0.0           # 威望
+var claims: Array = []        # 宣称 (第 6 块): "realm:国家" 王位、"county:领地"; 父母去世时没接上班的子女有 (照三代)
+var weak_claims: Array = []   # 从父母那里传下来的宣称 (照三代的「没有主张的宣称」: 能用来宣战, 不会再往下传)
+var levy_ratio := 1.0         # 兵补到了几成 (打完仗解散后每月补一成)
+var secrets: Array = []       # 秘密 (第 7 块): [{type: murder 杀过人 / attempted_murder 谋杀未遂, target, day, known: [谁知道], exposed}]
+var hooks := {}               # 把柄 (第 7 块): 攥着谁的 -> {strong, used: 上次用是哪天, secret: [靠哪个秘密]}
+var scheme_blocked: Array = []  # 不能再搞的阴谋 ("sway:人的 id": 拉拢过没成)
+var break_level := 0          # 压力崩溃到了第几档 (第 8 块: 第一次过 100 / 200 / 300 时崩溃, 五年最多一次)
+var last_break := -100000     # 上次崩溃是哪天
+var conditions: Array = []    # 一阵子的身体状况 (第 8 块: 落马受伤、咳嗽……): [{text, health, until}]
+var decision_used := {}       # 决议上次用是哪天 (有冷却的: 解压的决议三年一次)
+var boons: Array = []         # 一阵子每月多收 (少收) 的钱 (第 8 块: 集市、金匠、强盗……): [{text, gold, until}]
 
 
 ## 在某一天几岁 (过了生日才算长一岁; 死了的人停在死的那年)
@@ -93,6 +105,11 @@ func personality() -> Array:
 
 func congenital() -> Array:
 	return _of_kind("congenital")
+
+
+## 排解压力的毛病 (第 8 块)
+func coping() -> Array:
+	return _of_kind("coping")
 
 
 func _of_kind(kind: String) -> Array:
@@ -137,7 +154,8 @@ func add_stress(amount: float) -> void:
 const SAVE_FIELDS := ["id", "name", "female", "birth_day", "birth_estimated", "culture", "dna", "rank", "realm", "note",
 	"traits", "education", "base_skills", "stress", "father", "mother", "spouse", "former_spouses", "secondary", "homeland",
 	"betrothed", "pregnant", "last_birth", "focus", "guardian", "edu_points", "edu_years", "taught", "house", "alive",
-	"death_day", "prestige", "liege_realm", "contract", "gold", "tyranny", "prisoner_of", "dungeon", "crimes", "memories"]
+	"death_day", "prestige", "liege_realm", "contract", "gold", "tyranny", "prisoner_of", "dungeon", "crimes", "memories",
+	"claims", "weak_claims", "levy_ratio", "secrets", "hooks", "scheme_blocked", "break_level", "last_break", "conditions", "decision_used", "boons"]
 
 
 func to_save() -> Dictionary:
@@ -167,9 +185,9 @@ static func from_save(d: Dictionary) -> Person:
 	return p
 
 
-## 过了几天: 压力慢慢降
+## 过了几天: 压力慢慢降 (冷静的人两倍; 每个排解压力的毛病快 20%)
 func pass_days(days: int) -> void:
-	var decay := STRESS_DECAY * (2.0 if has_trait("calm") else 1.0)
+	var decay := STRESS_DECAY * (2.0 if has_trait("calm") else 1.0) * (1.0 + COPING_DECAY * coping().size())
 	add_stress(-decay * days / float(GameDate.YEAR_DAYS))
 
 
@@ -234,8 +252,10 @@ func health_parts(day: int, labels := true) -> Array:
 		var info := Traits.get_trait(t)
 		if info.has("health"):
 			parts.append([info.name, float(info.health)])
-	if stress_level() > 0:
-		parts.append([("压力 %d 档" % stress_level()) if labels else "", -0.5 * stress_level()])
+	if stress_level() >= 2:
+		parts.append([("压力 %d 档" % stress_level()) if labels else "", -1.0 if stress_level() == 2 else -2.0])  # 照三代: 第 2 档 -1、第 3 档 -2
+	for c in conditions:
+		parts.append([c.text if labels else "", float(c.health)])
 	if prisoner_of != "" and dungeon:
 		parts.append(["关在地牢里", DUNGEON_HEALTH])
 	return parts
@@ -280,7 +300,7 @@ func opinion_of(other: Person) -> Dictionary:
 			for o in other.personality():
 				if Traits.opposite(t, o):
 					parts.append(["我「%s」, 他「%s」" % [info.name, Traits.get_trait(o).name], -10])
-	for t in other.congenital():
+	for t in other.congenital() + other._of_kind("stress"):
 		var info := Traits.get_trait(t)
 		if info.has("opinion"):
 			parts.append(["他%s" % info.name, int(info.opinion)])

@@ -50,12 +50,12 @@ static func kind_desc(k: String) -> String:
 	return "领主: 管一块领地的贵族"
 
 
-## 亲自管的领地上限
-static func domain_limit(p: Person, _day: int) -> int:
+## 亲自管的领地上限 (rank_bonus: 大国王 +1、皇帝 +2, 照三代国王比公爵多 1、皇帝多 2; 第 8 块)
+static func domain_limit(p: Person, _day: int, rank_bonus := 0) -> int:
 	var edu := 0
 	if not p.education.is_empty() and int(p.education.level) > 0:
 		edu = EDU_DOMAIN[int(p.education.level) - 1]
-	return BASE_DOMAIN + RANK_DOMAIN + edu
+	return BASE_DOMAIN + RANK_DOMAIN + edu + rank_bonus
 
 
 ## 收回这个人的领地算不算暴政、算多少 (有理由的不算)

@@ -23,6 +23,12 @@ static func data() -> Dictionary:
 		for t in _data.childhood:
 			t.kind = "childhood"
 			_by_id[t.id] = t
+		for t in _data.get("coping", []):
+			t.kind = "coping"  # 压力崩溃时染上的毛病 (第 8 块)
+			_by_id[t.id] = t
+		for t in _data.get("stress", []):
+			t.kind = "stress"  # 崩溃得重了才有的 (忧郁、疯癫)
+			_by_id[t.id] = t
 	return _data
 
 

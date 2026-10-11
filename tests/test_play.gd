@@ -43,7 +43,7 @@ func click_map(p: Vector2, button := MOUSE_BUTTON_LEFT) -> void:
 
 ## 点界面上的一个能点的地方 (按位置找; 跟 Godot 一样, 后加的在上面, 先接到点击)
 func click_hud(p: Vector2) -> bool:
-	var all: Array = hud._spots + hud._alert_spots + hud._county_spots + hud._person_spots + hud._window_spots + hud._popup_spots
+	var all: Array = hud._spots + hud._alert_spots + hud._war_spots + hud._county_spots + hud._person_spots + hud._window_spots + hud._popup_spots
 	all.reverse()
 	for s in all:
 		if not s.visible or not Rect2(s.position, s.size).has_point(p):
@@ -181,7 +181,10 @@ func test_map_mode_buttons() -> void:
 
 
 func test_unfinished_buttons_say_later() -> void:
-	for y in Hud.RIGHT_MENU_Y.slice(1):  # 第一个「领地」第 5 块做好了
+	for i in Hud.RIGHT_MENU_Y.size():
+		if i in [0, 1, 4]:
+			continue  # 「领地」第 5 块、「军队」第 6 块、「阴谋」第 7 块做好了
+		var y: float = Hud.RIGHT_MENU_Y[i]
 		hud._toast = ""
 		check(click_hud(Vector2(1898, y)), "右边按钮 %d" % y)
 		has_text(hud._toast, "以后才有")
@@ -712,6 +715,9 @@ func test_autosave_each_year() -> void:
 	main.clock.paused = false
 	main.clock.set_speed(5)
 	while GameDate.from_day(main.clock.day)[0] == 867:
+		if not hud.popup.is_empty():
+			hud.close_popup()  # 打仗的弹窗 (盟友叫你帮忙……) 会暂停, 关掉接着走
+			main.clock.paused = false
 		main._process(1.0)
 	check(SaveGame.list().any(func(x: Dictionary) -> bool: return x.auto), "到 868 年自动存了一次档")
 
@@ -808,5 +814,270 @@ func test_ironman_menu() -> void:
 	main.clock.paused = false
 	main.clock.set_speed(5)
 	while GameDate.from_day(main.clock.day)[1] < 7:
+		if not hud.popup.is_empty():
+			hud.close_popup()
+			main.clock.paused = false
 		main._process(1.0)
 	check(SaveGame.list().any(func(x: Dictionary) -> bool: return x.label == "铁人模式"), "过了半年自动存了铁人模式的档")
+
+
+# ---- 打仗 (第 6 块) ----
+
+func row_named(prefix: String) -> int:
+	for i in hud.window.get("rows", []).size():
+		var r: Dictionary = hud.window.rows[i]
+		if r.has("name") and String(r.name).begins_with(prefix):
+			return i
+	return -1
+
+
+func test_army_window_raise_and_move() -> void:
+	main.play_as("wessex")
+	check(click_hud(Vector2(1898, Hud.RIGHT_MENU_Y[1])), "右边一列第二个「军队」")
+	eq(hud.window.get("kind", ""), "army")
+	var i := row_named("征兵")
+	check(i >= 0, "有征兵")
+	check(click_hud(hud._win_row_rect(i).get_center()))
+	var a := world.warfare.army_of(hud.player_id)
+	check(not a.is_empty(), "征了兵")
+	eq(map.selected_army, int(a.id), "征了兵就选中了")
+	check(row_named("解散军队") >= 0, "窗口里能解散")
+	# 右键点伦敦: 军队走过去
+	map.focus(world.by_id.london.seat, 1.0)
+	click_map(map.map_to_screen(world.by_id.london.seat), MOUSE_BUTTON_RIGHT)
+	check(not a.path.is_empty(), "右键点了地, 军队有路要走")
+	eq(a.path[a.path.size() - 1][0], "london", "去伦敦")
+	has_text(hud._toast, "去伦敦")
+	# 点军队的小牌子也能选中
+	map.selected_army = -1
+	map.focus(world.warfare.army_pos(a), 1.0)
+	click_map(map.army_rect(a).get_center())
+	eq(map.selected_army, int(a.id), "点牌子选中了")
+	key(KEY_ESCAPE)
+	eq(map.selected_army, -1, "Esc 不选了")
+
+
+func test_declare_war_from_actions() -> void:
+	main.new_game({"wars": "off"}, 3)
+	world = main.world
+	hud = main.hud
+	map = main.map
+	main.play_as("isles")
+	var me := hud.me()
+	hud.show_person(world.realms.man.ruler_id)
+	check(click_hud(person_button("互动")))
+	var i := row_named("宣战")
+	check(i >= 0, "互动里有宣战")
+	check(click_hud(hud._win_row_rect(i).get_center()))
+	eq(hud.window.get("kind", ""), "declare", "打开宣战窗口")
+	var j := row_named("征服")
+	check(j >= 0, "维京人能征服")
+	check(click_hud(hud._win_row_rect(j).get_center()))
+	check(world.warfare.wars.is_empty(), "点一次还不算")
+	check(click_hud(hud._win_row_rect(j).get_center()))
+	eq(world.warfare.wars.size(), 1, "点两次宣战了")
+	eq(hud.window.get("kind", ""), "war", "接着打开战争窗口")
+	hud.redraw()
+	eq(hud._war_spots.size(), 1, "右上角多了这场仗的小图标")
+	check(me.prestige < War.START_PRESTIGE_KING, "花了威望")
+	# 投降 (点两次)
+	var k := row_named("投降")
+	check(click_hud(hud._win_row_rect(k).get_center()))
+	check(click_hud(hud._win_row_rect(k).get_center()))
+	check(world.warfare.wars.is_empty(), "投降了, 仗打完了")
+	eq(hud.popup.get("kind", ""), "info", "弹窗说仗打完了")
+	has_text(hud.popup.title, "打输了")
+
+
+func test_war_declared_on_player_pauses() -> void:
+	main.new_game({"wars": "off"}, 3)
+	world = main.world
+	hud = main.hud
+	main.play_as("man")
+	main.clock.paused = false
+	var att := world.ruler("isles")
+	var o: Dictionary = {}
+	for x in world.warfare.cb_options(att, hud.me()):
+		if x.cb == "conquest":
+			o = x
+	var ev := []
+	world.warfare.declare(att, o, main.clock.day, ev)
+	main.handle_events(ev)
+	check(main.clock.paused, "有人向你宣战, 暂停")
+	has_text(hud.popup.title, "向你宣战")
+	hud.close_popup()
+	hud.redraw()
+	eq(hud._war_spots.size(), 1)
+
+
+func test_ally_call_popup() -> void:
+	main.new_game({"wars": "off"}, 3)
+	world = main.world
+	hud = main.hud
+	main.play_as("wessex")
+	var wf := world.warfare
+	var ev := []
+	wf.declare(world.ruler("great_army"), {"cb": "conquest", "target": "nottingham", "targets": ["nottingham"], "claimant": "", "cost": 0.0,
+			"label": "抢诺丁汉", "defender": world.ruler("mercia").id, "ok": true, "why": "", "truce": false}, main.clock.day, ev, true)
+	main.handle_events(ev)
+	eq(hud.popup.get("kind", ""), "ask", "盟友麦西亚挨打了, 问你去不去")
+	check(click_hud(Hud.ASK_BUTTONS[0].get_center()), "点「去帮忙」")
+	check(wf.wars[0].defenders.has(hud.player_id), "加入了防守方")
+
+
+# ---- 阴谋 (第 7 块) ----
+
+func test_murder_scheme_from_actions() -> void:
+	main.new_game({"wars": "off"}, 3)
+	world = main.world
+	hud = main.hud
+	main.play_as("wessex")
+	var me := hud.me()
+	me.base_skills.intrigue = 30
+	var t := world.ruler("mercia")
+	hud.show_person(t.id)
+	check(click_hud(person_button("互动")))
+	var i := row_named("暗杀")
+	check(i >= 0, "互动里有暗杀")
+	check(click_hud(hud._win_row_rect(i).get_center()))
+	check(world.intrigue.schemes.is_empty(), "点一次还不算")
+	check(click_hud(hud._win_row_rect(i).get_center()))
+	var s := world.intrigue.scheme_of(me.id, "murder")
+	check(not s.is_empty(), "开始暗杀了")
+	eq(hud.window.get("kind", ""), "scheme", "打开这个阴谋")
+	# 拉内应
+	var j := row_named("拉内应")
+	check(click_hud(hud._win_row_rect(j).get_center()))
+	eq(hud.window.get("kind", ""), "agents")
+	check(not hud.window.rows.is_empty(), "有能拉的人")
+	me.gold = 500.0
+	check(click_hud(hud._win_row_rect(0).get_center()))
+	eq(hud.window.get("kind", ""), "scheme", "拉完回到阴谋窗口")
+	# 右边一列「阴谋」
+	hud.close_window()
+	check(click_hud(Vector2(1898, Hud.RIGHT_MENU_Y[4])), "右边一列第五个「阴谋」")
+	eq(hud.window.get("kind", ""), "schemes")
+	check(row_named("暗杀") >= 0, "阴谋窗口里有这个暗杀")
+	# 攒够机会: 提醒, 动手
+	s.advantages = Schemes.READY
+	hud.redraw()
+	check(hud.alerts.any(func(a: Dictionary) -> bool: return a.kind == "scheme_ready"), "提醒可以动手")
+	hud._open_scheme(int(s.id))
+	var k := row_named("动手")
+	check(click_hud(hud._win_row_rect(k).get_center()))
+	check(click_hud(hud._win_row_rect(k).get_center()))
+	check(not world.intrigue.schemes.has(int(s.id)), "动手了, 阴谋结束")
+
+
+func test_blackmail_popup() -> void:
+	main.new_game({"wars": "off"}, 3)
+	world = main.world
+	hud = main.hud
+	main.play_as("wessex")
+	var me := hud.me()
+	var k := world.ruler("mercia")
+	me.secrets.append({"type": "murder", "target": world.ruler("alba").id, "day": main.clock.day, "known": [k.id], "exposed": false})
+	var ev := []
+	world.intrigue.blackmail(k, me, me.secrets[0], main.clock.day, ev)
+	main.handle_events(ev)
+	eq(hud.popup.get("kind", ""), "ask", "被勒索: 问你给不给把柄")
+	check(click_hud(Hud.ASK_BUTTONS[0].get_center()), "给他把柄")
+	check(world.intrigue.held_by(me, k), "他攥着你的把柄了")
+	check(world.warfare.cb_options(me, k).all(func(o: Dictionary) -> bool: return not o.ok), "不能对他宣战了")
+
+
+# ---- 第 8 块: 决议、随机事件 ----
+
+func test_decisions_window() -> void:
+	main.play_as("alba")
+	var k := world.ruler("alba")
+	k.gold = 400.0
+	var c: Vector2 = Hud.BOTTOM_ROW[3][0]
+	check(click_hud(c), "左下角最右边的「决议」能点")
+	eq(hud.window.get("kind", ""), "decisions")
+	var i := -1
+	for j in hud.window.rows.size():
+		if hud.window.rows[j].id == "kingdom:scotland":
+			i = j
+	check(i >= 0, "列出建立苏格兰王国")
+	var rect := hud._win_row_rect(i)
+	click_hud(rect.get_center())
+	eq(world.title_holder("kingdom", "scotland"), "", "要点两次")
+	click_hud(rect.get_center())
+	eq(world.title_holder("kingdom", "scotland"), "alba", "点两次就建立了")
+	eq(world.realms.alba.title, "苏格兰国王")
+	no_meta("决议窗口")
+
+
+func test_decision_alert() -> void:
+	main.play_as("alba")
+	world.ruler("alba").gold = 400.0
+	hud._dec_day = -1
+	var kinds: Array = hud.alerts_now().map(func(a: Dictionary) -> String: return a.kind)
+	check(kinds.has("decision"), "能建立王国: 上方有提醒 %s" % str(kinds))
+
+
+func test_story_popup_click() -> void:
+	main.play_as("wessex")
+	var me := hud.me()
+	var d := {}
+	for x in StoryEvents.defs():
+		if x.id == "wandering_poet":
+			d = x
+	me.gold = 0.0
+	var s := world.story.build(d, {"w": world, "me": me, "day": main.clock.day, "events": []})
+	main.clock.paused = false
+	main.handle_events([{"type": "story", "story": s, "day": main.clock.day}])
+	eq(hud.popup.get("kind", ""), "story", "事件弹窗")
+	check(main.clock.paused, "弹窗时暂停")
+	no_meta("事件窗口")
+	click_hud(hud.story_option_rect(0, s.options.size()).get_center())
+	eq(hud.popup.get("kind", ""), "story", "钱不够: 点了没用")
+	me.gold = 50.0
+	var g0 := me.gold
+	check(click_hud(hud.story_option_rect(0, s.options.size()).get_center()), "点第一个办法")
+	check(hud.popup.is_empty(), "选了就关上")
+	eq(me.gold, g0 - 10.0, "赏了诗人 10 金币")
+
+
+func test_story_keys_and_history() -> void:
+	main.play_as("wessex")
+	var me := hud.me()
+	var d := {}
+	for x in StoryEvents.defs():
+		if x.id == "eclipse_878":
+			d = x
+	var s := world.story.build(d, {"w": world, "me": me, "day": main.clock.day, "events": []})
+	main.handle_events([{"type": "story", "story": s, "day": main.clock.day}])
+	var book := false
+	for sp in hud._popup_spots:
+		if Rect2(sp.position, sp.size) == Hud.STORY_BOOK:
+			book = sp.tooltip_text.begins_with("历史背景")
+	check(book, "照史料来的事件右上角有历史背景")
+	key(KEY_ESCAPE)
+	eq(hud.popup.get("kind", ""), "story", "Esc 关不掉, 一定要选")
+	var p0 := me.prestige
+	key(KEY_1)
+	check(hud.popup.is_empty(), "按 1 选第一个")
+	eq(me.prestige, p0 + 5.0)
+
+
+func test_player_abdicates_from_breakdown() -> void:
+	main.play_as("wessex")
+	var me := hud.me()
+	var heir := world.heir("wessex", main.clock.day)
+	me.stress = 330.0
+	var ev := []
+	world.story._check_breaks(main.clock.day, ev)
+	main.handle_events(ev)
+	eq(hud.popup.get("kind", ""), "story")
+	var s: Dictionary = hud.popup.story
+	var i := -1
+	for k in s.options.size():
+		if s.options[k].get("kind", "") == "abdicate":
+			i = k
+	check(i >= 0, "第 3 档能让位")
+	click_hud(hud.story_option_rect(i, s.options.size()).get_center())
+	eq(hud.player_id, heir.id, "让位以后接着玩继承人")
+	eq(hud.popup.get("kind", ""), "succession", "弹出继位的窗口")
+	check(hud.popup.event.abdicated)

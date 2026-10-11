@@ -226,10 +226,15 @@ static func acceptance(w: World, me: Person, mine: Person, theirs: Person, day: 
 		parts.append(["信的教不一样 (%s / %s)" % [faith_name(faith_of(mine.culture)), faith_name(faith_of(theirs.culture))], -25])
 	if w.historical_match(mine, theirs) != "":
 		parts.append(["两家早有结亲的意思", 30])
+	var hook := 0
+	if me != null and head != me and w.intrigue.hook_ready(me, head, day):
+		var strong: bool = w.intrigue.hook_on(me, head).strong
+		hook = Schemes.HOOK_MARRIAGE[strong]
+		parts.append(["你攥着%s的把柄 (%s, 不用就不答应时才用掉)" % [head.name, "强" if strong else "弱"], hook])
 	var total := 0
 	for x in parts:
 		total += int(x[1])
-	return {"total": total, "parts": parts}
+	return {"total": total, "parts": parts, "hook": hook}
 
 
 ## 电脑给 seeker 挑对象时的分数 (越高越好)

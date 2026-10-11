@@ -1,5 +1,5 @@
 {
- "说明": "867 年 1 月 1 日的不列颠群岛。爵位: 帝国 > 王国 > 公国 > 领地 (伯爵领)。holder 是开局时这块领地归哪个国家。ruler 为 null 的国家开局时随机生成统治者 (用 culture 那种文化的名字)。born 是统治者的生年, born_estimated 为 true 是史料没记、估计的。looks 是史料里讲到的长相 (盖过随机的长相基因)。 personality 是史料里能看出来的性格 (不够 3 个随机补), base_skills 是史料里看得出擅长的本事 (底子 8 = 中上, 10 = 高); 都写在 note 里。 house 是家族 (houses 里有名字); titles 是手里的几个公国一级头衔 (平分继承时分给儿子们)。family 是开局有记载的家人 (born 生年估计, died 卒年, 有 died 的开局已经去世, 用来连起家谱)。 former_spouses 是以前的配偶 (死了的); history 是开局以后史料里的婚事和孩子 (第 4 块): marriages 两个人都在、都活着、都没结婚、不是玩家家里的人, 到了 year 年电脑照史料安排; children 是这对父母 (没写 mother 的只看父亲) 史料里的孩子, 生男生女还是随机的, 生出来按顺序用史料里的名字。 vassals 是开局有记载的封臣 (第 5 块): county 是他管的领地; 别的封臣随机生成。",
+ "说明": "867 年 1 月 1 日的不列颠群岛。爵位: 帝国 > 王国 > 公国 > 领地 (伯爵领)。holder 是开局时这块领地归哪个国家。ruler 为 null 的国家开局时随机生成统治者 (用 culture 那种文化的名字)。born 是统治者的生年, born_estimated 为 true 是史料没记、估计的。looks 是史料里讲到的长相 (盖过随机的长相基因)。 personality 是史料里能看出来的性格 (不够 3 个随机补), base_skills 是史料里看得出擅长的本事 (底子 8 = 中上, 10 = 高); 都写在 note 里。 house 是家族 (houses 里有名字); titles 是手里的几个公国一级头衔 (平分继承时分给儿子们)。family 是开局有记载的家人 (born 生年估计, died 卒年, 有 died 的开局已经去世, 用来连起家谱)。 former_spouses 是以前的配偶 (死了的); history 是开局以后史料里的婚事和孩子 (第 4 块): marriages 两个人都在、都活着、都没结婚、不是玩家家里的人, 到了 year 年电脑照史料安排; children 是这对父母 (没写 mother 的只看父亲) 史料里的孩子, 生男生女还是随机的, 生出来按顺序用史料里的名字。 vassals 是开局有记载的封臣 (第 5 块): county 是他管的领地; 别的封臣随机生成。 第 6 块: special_troops 是不用养、死了不补的兵 (维京大军); forts 是城墙多几级 (罗马人留下城墙的城、岩石上的要塞); family 的 court 是住在哪个国王那里 (没领地), claims 是对哪个国家有宣称; history.wars 是开局以后史料里的仗, 到了那年那月电脑去宣战, 输赢看真打 (开局设置「历史上的仗」能关掉)。 history.reinforcements 是史料里维京人的援兵: 到了那年那月这个国家还在, 就多这么多不用养的兵。 history.schemes 是史料里的阴谋 (第 7 块): 到了那年那月两个国王都还在, 电脑开始这个阴谋, 成不成看真的。 titular_kingdoms 是本来没有、靠特别决议建立的王国 (第 8 块: 丹麦法区、群岛、坎布里亚)。",
  "start_date": [
   867,
   1,
@@ -1328,7 +1328,7 @@
    "culture": "norse",
    "born": 830,
    "born_estimated": true,
-   "note": "生年不详, 估计 狡诈: 冰岛萨迦都说他足智多谋、会用计。残忍: 圣人传记说他和弟弟乌巴杀了不肯弃教的东盎格利亚国王埃德蒙。外号「无骨者」的意思说法不一, 没加特点。",
+   "note": "生年不详, 估计 狡诈: 冰岛萨迦都说他足智多谋、会用计。残忍: 圣人传记说他和弟弟乌巴杀了不肯弃教的东盎格利亚国王埃德蒙。外号「无骨者」的意思说法不一, 没加特点。 兵: 史学家估计维京大军不到一千到几千人 (维基百科 Great Heathen Army), 用户 2026-10-11 选了 2000 个不用养、不补充的兵。",
    "personality": [
     "deceitful",
     "sadistic"
@@ -1338,7 +1338,8 @@
     "intrigue": 10
    },
    "house": "lodbrok",
-   "father": "ragnar"
+   "father": "ragnar",
+   "special_troops": 2000
   },
   {
    "id": "cornwall",
@@ -1791,6 +1792,11 @@
    "id": "ui_failge",
    "name": "乌伊法尔吉王族",
    "desc": "伦斯特西部乌伊法尔吉的王族"
+  },
+  {
+   "id": "osberht_house",
+   "name": "奥斯伯特家族",
+   "desc": "诺森布里亚老国王奥斯伯特的家族 (祖上不详)"
   }
  ],
  "family": [
@@ -2501,6 +2507,19 @@
    "culture": "anglo_saxon",
    "spouse": "aethelred_mucel",
    "note": "埃塞尔雷德·穆赫尔的妻子, 埃尔斯维斯的母亲 (阿瑟: 出身麦西亚王族, 「一位了不起的女人」, 丈夫死后守寡多年, 阿瑟亲眼见过她)。生年估计"
+  },
+  {
+   "id": "osberht",
+   "name": "奥斯伯特",
+   "female": false,
+   "born": 822,
+   "house": "osberht_house",
+   "culture": "anglo_saxon",
+   "court": "northumbria",
+   "claims": [
+    "northumbria"
+   ],
+   "note": "诺森布里亚国王 (大约 849–862 年在位), 后来被诺森布里亚人赶下台, 立了埃拉。维京人来了以后两人和好, 867 年 3 月 21 日一起攻打约克, 两个国王都战死 (盎格鲁-撒克逊编年史; 西缅说他是「正统的国王」, 埃拉是篡位的; 有一个史料说埃拉是他弟弟, 别的都没这么说)。祖上不详, 生年估计。用户 2026-10-11 同意补上他, 对诺森布里亚有宣称。"
   }
  ],
  "history": {
@@ -2973,6 +2992,91 @@
      }
     ]
    }
+  ],
+  "wars": [
+   {
+    "year": 867,
+    "month": 1,
+    "attacker": "northumbria",
+    "defender": "great_army",
+    "cb": "de_jure",
+    "target": "york",
+    "note": "866 年 11 月 21 日维京大军占了约克; 867 年 3 月 21 日诺森布里亚的埃拉和奥斯伯特联手攻打约克, 两个国王都战死 (盎格鲁-撒克逊编年史、西缅)。开局就在打 (三代开局也是维京大军跟英格兰几国打着)"
+   },
+   {
+    "year": 867,
+    "month": 10,
+    "attacker": "great_army",
+    "defender": "mercia",
+    "cb": "conquest",
+    "target": "nottingham",
+    "note": "867 年维京大军进了麦西亚, 在诺丁汉过冬; 麦西亚请威塞克斯一起围诺丁汉, 没打下来, 最后麦西亚给钱讲和 (维基百科 Great Heathen Army)"
+   },
+   {
+    "year": 868,
+    "month": 6,
+    "attacker": "ailech",
+    "defender": "mide",
+    "cb": "punitive",
+    "target": "brega",
+    "note": "868 年至尊王艾德·芬德利亚斯在基利尼尔打败布雷加、伦斯特和维京人, 布雷加国王弗兰战死 (阿尔斯特年鉴; 维基百科 Áed Findliath)"
+   },
+   {
+    "year": 869,
+    "month": 9,
+    "attacker": "great_army",
+    "defender": "east_anglia",
+    "cb": "conquest",
+    "target": "duchy:east_anglia",
+    "note": "869 年秋维京大军回到东盎格利亚, 在塞特福德过冬; 国王埃德蒙跟他们打, 被俘被杀 (维基百科 Great Heathen Army)"
+   },
+   {
+    "year": 870,
+    "month": 3,
+    "attacker": "dublin",
+    "defender": "strathclyde",
+    "cb": "punitive",
+    "target": "dumbarton",
+    "note": "870 年都柏林的阿姆莱夫和伊马尔围攻斯特拉斯克莱德的都城邓巴顿四个月, 打下来, 871 年带着很多俘虏回都柏林 (阿尔斯特年鉴)"
+   },
+   {
+    "year": 870,
+    "month": 6,
+    "attacker": "ailech",
+    "defender": "leinster",
+    "cb": "punitive",
+    "target": "naas",
+    "note": "870 年艾德联合奥索里的凯尔伯尔入侵伦斯特 (维基百科 Áed Findliath)"
+   },
+   {
+    "year": 870,
+    "month": 11,
+    "attacker": "great_army",
+    "defender": "wessex",
+    "cb": "conquest",
+    "target": "berkshire",
+    "note": "870 年底维京大军占了雷丁 (伯克郡), 871 年初在阿什当被埃塞尔雷德和阿尔弗雷德打败, 后来又打了几仗; 871 年阿尔弗雷德给钱讲和 (维基百科 Great Heathen Army)"
+   }
+  ],
+  "reinforcements": [
+   {
+    "year": 871,
+    "month": 4,
+    "realm": "great_army",
+    "special": 1000,
+    "where": "berkshire",
+    "note": "盎格鲁-撒克逊编年史 (C 本) 871 年: 梅雷顿之战 (3 月 22 日) 以后「一支很大的夏季大军来到雷丁」, 复活节时埃塞尔雷德去世。没记是谁带来的、有多少人; 1000 人是我们定的 (用户 2026-10-11 同意加援兵)"
+   }
+  ],
+  "schemes": [
+   {
+    "year": 872,
+    "month": 1,
+    "schemer": "alba",
+    "target": "strathclyde",
+    "kind": "murder",
+    "note": "阿尔斯特年鉴 872 年: 斯特拉斯克莱德国王阿特加尔「在康斯坦丁的唆使下被杀」; 接位的鲁恩娶了康斯坦丁的妹妹 (维基百科 Arthgal ap Dyfnwal)。用户 2026-10-11 选了照着来: 电脑那年开始这个阴谋, 成不成看真的"
+   }
   ]
  },
  "vassals": [
@@ -3038,6 +3142,39 @@
    "house": "ui_failge",
    "county": "ui_failge",
    "note": "乌伊法尔吉国王 (年鉴只记他 881 年去世; 前一个国王 849 年死, 所以 867 年多半是他)。生年估计"
+  }
+ ],
+ "forts": {
+  "york": 1,
+  "chester": 1,
+  "lincoln": 1,
+  "london": 1,
+  "colchester": 1,
+  "canterbury": 1,
+  "rochester": 1,
+  "gloucester": 1,
+  "leicester": 1,
+  "carlisle": 1,
+  "hampshire": 1,
+  "devon": 1,
+  "dumbarton": 1,
+  "bamburgh": 1
+ },
+ "titular_kingdoms": [
+  {
+   "id": "danelaw",
+   "name": "丹麦法区",
+   "note": "阿尔弗雷德和古特鲁姆的条约 (878–890 年之间) 以泰晤士河、华特林大道为界, 后来叫丹麦法区 (维基百科 Danelaw、Guthrum)。决议: 维京国王跟英格兰的国王谈判划界"
+  },
+  {
+   "id": "k_isles",
+   "name": "群岛",
+   "note": "维基百科「群岛王国」说大约 849 年形成, 管马恩岛、赫布里底和克莱德湾的岛 (另一个条目说 1079 年才有马恩岛王国, 说法不一)。决议: 把群岛升成正式的王国"
+  },
+  {
+   "id": "k_cumbria",
+   "name": "坎布里亚",
+   "note": "斯特拉斯克莱德 10 世纪初往南扩, 927 年边界到彭里斯附近, 后来这个王国叫坎布里亚 (维基百科 Owain ap Dyfnwal)。决议: 斯特拉斯克莱德升成坎布里亚王国"
   }
  ]
 }

@@ -119,6 +119,9 @@ func _run() -> void:
 	hud.close_window()
 	main.close_panel()
 	w.marry(alfred, w.people["ealhswith"], main.clock.day, [])
+	while not hud.popup.is_empty():
+		print("关掉挡着的窗口: ", hud.popup.kind, " ", hud.popup.get("story", {}).get("id", ""))
+		hud.close_popup()
 	var ev := []
 	w.people["ealhswith"].pregnant = {"father": "alfred", "due": main.clock.day}
 	w._give_birth(w.people["ealhswith"], main.clock.day, ev)
@@ -192,6 +195,157 @@ func _run() -> void:
 	map.show_all()
 	hud.redraw()
 	await _shot("34_提醒")
+
+	# 第 6 块「打仗」: 玩诺森布里亚 (开局就在跟维京大军打)
+	main.new_game({}, 5)
+	w = main.world
+	map = main.map
+	hud = main.hud
+	main.play_as("northumbria")
+	var me: Person = hud.me()
+	var wf := w.warfare
+	var war: Dictionary = wf.wars_of(me.id)[0]
+	hud._open_army_window()
+	await _shot("35_军队窗口")
+	hud._choose_row(0)  # 征兵
+	var army: Dictionary = wf.army_of(me.id)
+	map.selected_army = army.id
+	wf.order_move(army, "york")
+	hud.close_window()
+	main.clock.paused = false
+	main.clock.set_speed(3)
+	for i in 12:
+		main._process(1.0)
+	map.focus(w.by_id.york.seat, 1.3)
+	hud.redraw()
+	await _shot("36_地图_行军")
+	var tries := 0
+	while wf.battles.is_empty() and tries < 400:
+		tries += 1
+		if not hud.popup.is_empty():
+			hud.close_popup()
+		main.clock.paused = false
+		main._process(0.2)
+	map.focus(w.by_id.york.seat, 1.3)
+	hud.redraw()
+	await _shot("37_地图_打仗")
+	hud._open_war(int(war.id))
+	await _shot("38_战争窗口")
+	hud.close_window()
+	# 围城: 让一支军队停在敌人的地上 (找一场有人在围城的仗)
+	tries = 0
+	while wf.sieges.is_empty() and tries < 3000:
+		tries += 1
+		if not hud.popup.is_empty():
+			hud.close_popup()
+		main.clock.paused = false
+		main.clock.set_speed(5)
+		main._process(0.2)
+	if not wf.sieges.is_empty():
+		map.focus(w.by_id[wf.sieges.keys()[0]].seat, 1.3)
+	hud.redraw()
+	await _shot("39_地图_围城")
+	while not hud.popup.is_empty():
+		hud.close_popup()
+	# 宣战窗口: 对阿尔巴国王
+	main.clock.paused = true
+	hud.show_person(w.realms.alba.ruler_id)
+	hud._open_actions()
+	await _shot("40_互动_宣战")
+	hud._open_window("declare")
+	await _shot("41_宣战窗口")
+	hud.close_window()
+	hud.close_person()
+	# 盟友叫你帮忙 (问你要不要)
+	var other: Dictionary = {}
+	for x in wf.wars:
+		if wf.side(x, me.id) == 0:
+			other = x
+	if not other.is_empty():
+		main.handle_events([{"type": "ally_call", "war": other.id, "ally": me.id, "leader": other.defender, "side": -1, "day": main.clock.day}])
+	else:
+		hud.show_popup({"kind": "ask", "icon": "rings", "title": "请你帮忙打仗", "lines": ["(这一局没有别的仗)"], "yes": "去帮忙", "no": "不去"})
+	await _shot("42_盟友求助")
+	hud.close_popup()
+
+	# 第 7 块「阴谋」: 玩威塞克斯, 暗杀麦西亚国王
+	main.new_game({"wars": "off"}, 3)
+	w = main.world
+	map = main.map
+	hud = main.hud
+	main.play_as("wessex")
+	var king: Person = hud.me()
+	king.base_skills.intrigue = 14
+	king.gold = 300.0
+	var vic: Person = w.ruler("mercia")
+	hud.show_person(vic.id)
+	hud._open_actions()
+	await _shot("43_互动_暗杀拉拢")
+	var ev2 := []
+	var r2 := w.intrigue.start(king, vic, "murder", main.clock.day, ev2)
+	var sc: Dictionary = w.intrigue.schemes[int(r2.scheme)]
+	hud._open_window("agents", 0, {"scheme": int(sc.id)})
+	await _shot("44_拉内应")
+	for q in w.intrigue.agent_candidates(sc).slice(0, 2):
+		w.intrigue.invite(sc, q, main.clock.day)
+	sc.advantages = 3
+	sc.progress = 10.0
+	hud._open_scheme(int(sc.id))
+	await _shot("45_暗杀窗口")
+	w.intrigue.start(king, w.ruler("alba"), "sway", main.clock.day, [])
+	hud.close_person()
+	hud._open_schemes_window()
+	await _shot("46_阴谋窗口")
+	hud.close_window()
+	main.handle_events([{"type": "scheme_revealed", "scheme": 0, "owner": w.ruler("east_anglia").id, "target": king.id, "day": main.clock.day}])
+	await _shot("47_有人要暗杀你")
+	hud.close_popup()
+
+	# 第 8 块「随机事件和决议」
+	main.new_game({"wars": "off"}, 3)
+	w = main.world
+	map = main.map
+	hud = main.hud
+	main.play_as("alba")
+	hud.me().gold = 400.0
+	hud._dec_day = -1
+	hud._open_decisions()
+	await _shot("48_决议窗口")
+	hud.close_window()
+	await _shot("49_提醒_能建立王国")
+	main.play_as("wessex")
+	var me8: Person = hud.me()
+	if me8.living_spouse() == null:
+		var bride := w.make_noble("anglo_saxon", true, 22, main.clock.day)
+		w._register(bride)
+		w.marry(me8, bride, main.clock.day, [])
+	me8.traits = ["shy", "just", "calm"]
+	me8.gold = 10.0  # 送礼要 15: 拍「钱不够」的样子
+	var defs := {}
+	for d in StoryEvents.defs():
+		defs[d.id] = d
+	main.handle_events([{"type": "story", "story": w.story.build(defs.neglected_spouse, {"w": w, "me": me8, "day": main.clock.day, "events": [], "sp": me8.living_spouse().id}), "day": main.clock.day}])
+	await _shot("50_事件_冷落了家里人")
+	hud._pick_story(0)
+	main.handle_events([{"type": "story", "story": w.story.build(defs.eclipse_878, {"w": w, "me": me8, "day": main.clock.day, "events": []}), "day": main.clock.day}])
+	await _shot("51_事件_日食_历史背景")
+	hud._pick_story(0)
+	me8.stress = 330.0
+	var evb := []
+	w.story._check_breaks(main.clock.day, evb)
+	main.handle_events(evb)
+	await _shot("52_崩溃了")
+	hud._pick_story(0)
+	me8.traits.append_array(["drunkard", "journaller"])
+	StoryEvents.add_trait(me8, "melancholic")
+	me8.stress = 180.0
+	hud.show_person(me8.id)
+	await _shot("53_人物窗口_压力毛病")
+	hud.close_person()
+	hud._dec_day = -1
+	hud._open_decisions()
+	await _shot("54_决议_排解压力")
+	hud.close_window()
 	for file in DirAccess.get_files_at(SaveGame.dir):
 		DirAccess.remove_absolute(SaveGame.dir.path_join(file))
 	quit()
@@ -236,6 +390,8 @@ class TraitSheet:
 		for t in Traits.data().congenital:
 			items.append([t.id, t.name])
 		for t in Traits.data().childhood:
+			items.append([t.id, t.name])
+		for t in Traits.data().coping + Traits.data().stress:
 			items.append([t.id, t.name])
 		for tr in Traits.data().education.tracks:
 			for lv in [1, 4]:

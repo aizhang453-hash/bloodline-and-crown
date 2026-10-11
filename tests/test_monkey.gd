@@ -31,9 +31,9 @@ func test_random_play() -> void:
 		var p := Vector2(rng.randf_range(0, 1920), rng.randf_range(0, 1080))
 		match rng.randi_range(0, 9):
 			0, 1:
-				_click_map(map, p)
+				_click_map(map, p, MOUSE_BUTTON_LEFT if rng.randf() < 0.8 else MOUSE_BUTTON_RIGHT)
 			2:
-				var all: Array = hud._spots + hud._alert_spots + hud._county_spots + hud._person_spots + hud._window_spots + hud._popup_spots
+				var all: Array = hud._spots + hud._alert_spots + hud._war_spots + hud._county_spots + hud._person_spots + hud._window_spots + hud._popup_spots
 				all.reverse()
 				for s in all:
 					if s.visible and Rect2(s.position, s.size).has_point(p):
@@ -66,8 +66,19 @@ func test_random_play() -> void:
 			9:
 				# 打开你的国家, 或者对你国家里随便一个人「互动」 (第 5 块)
 				if hud.player_id != "" and hud.popup.is_empty():
-					if rng.randf() < 0.4:
+					var r := rng.randf()
+					if r < 0.2:
 						hud._open_realm_window()
+					elif r < 0.3:
+						hud._open_schemes_window()  # 阴谋 (第 7 块)
+					elif r < 0.35:
+						hud._open_decisions()  # 决议 (第 8 块)
+					elif r < 0.4:
+						# 军队 (第 6 块): 打开军队窗口, 有时选中自己的军队
+						hud._open_army_window()
+						var mine: Dictionary = main.world.warfare.army_of(hud.player_id)
+						if not mine.is_empty() and rng.randf() < 0.5:
+							map.selected_army = mine.id
 					else:
 						var them: Array = main.world.living.values().filter(func(x: Person) -> bool: return main.world.home_realm(x) == hud.player)
 						if not them.is_empty():
@@ -93,8 +104,15 @@ func test_random_play() -> void:
 		check(hud.player == "" or main.world.realms.has(hud.player), "玩家的国家是真的")
 		check(hud.player != "" or clock.paused, "没选国王时间不走")
 		check(main.world.player == hud.player_id or clock.paused, "世界知道玩家是谁")
-		check(hud.window.is_empty() or hud.window.kind in ["realm", "grant"] or hud.person_id == hud.window.person, "说亲、教育、互动的窗口跟着人物窗口")
+		check(hud.window.is_empty() or hud.window.kind in ["realm", "grant", "army", "war", "commander", "schemes", "scheme", "agents", "decisions"] or hud.person_id == hud.window.person, "说亲、教育、互动、宣战的窗口跟着人物窗口")
+		for a in main.world.warfare.armies.values():
+			check(a.levy >= 0.0 and a.special >= 0.0, "军队的人数不是负数")
+			check(main.world.by_id.has(a.loc), "军队在一块真的地上")
 		check(hud.player_id == "" or main.world.is_landed(main.world.people[hud.player_id]) or not hud.popup.is_empty(), "玩家有领地 (不然游戏结束)")
+		check(hud.popup.get("kind", "") != "story" or not hud.popup.story.options.is_empty(), "事件至少有一个办法")
+		if hud.player_id != "":
+			var me: Person = main.world.people[hud.player_id]
+			check(me.stress >= 0.0 and me.stress <= Person.MAX_STRESS, "压力在 0 到 %d" % int(Person.MAX_STRESS))
 		if not failures.is_empty():
 			failures.append("第 %d 步出的错" % i)
 			return
@@ -102,10 +120,10 @@ func test_random_play() -> void:
 	check(clock.day > main.world.start_day, "时间走过")
 
 
-func _click_map(map: MapView, p: Vector2) -> void:
+func _click_map(map: MapView, p: Vector2, button := MOUSE_BUTTON_LEFT) -> void:
 	for pressed in [true, false]:
 		var ev := InputEventMouseButton.new()
 		ev.position = p
-		ev.button_index = MOUSE_BUTTON_LEFT
+		ev.button_index = button
 		ev.pressed = pressed
 		map._unhandled_input(ev)

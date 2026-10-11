@@ -81,3 +81,32 @@ func test_list_and_autosave_name() -> void:
 	check(list.any(func(x: Dictionary) -> bool: return x.label == "第一个" and not x.auto))
 	SaveGame.write("自动存档", w, Clock.new(w.start_day + 80), {}, SaveGame.AUTO)
 	eq(SaveGame.list().size(), 2, "自动存档每次盖掉上一次")
+
+
+func _war_digest(world: World) -> String:
+	var parts := []
+	for a in world.warfare.armies.values():
+		parts.append("%s@%s:%d" % [a.owner, a.loc, int(world.warfare.soldiers(a))])
+	for war in world.warfare.wars:
+		parts.append("war %s>%s %d" % [war.attacker, war.defender, int(world.warfare.score(war).total)])
+	for c in world.counties:
+		if c.occupier != "":
+			parts.append("occ %s %s" % [c.id, c.occupier])
+	return " | ".join(parts)
+
+
+func test_mid_war_save_continues_the_same() -> void:
+	# 打仗打到一半 (开局维京大军和诺森布里亚就在打) 存档, 读回来接着走, 军队、战争、占领都跟没存过一样
+	var day := w.start_day
+	for i in 50:
+		day += 1
+		w.advance(1, day)
+	check(not w.warfare.armies.is_empty(), "存档时有军队在外面")
+	var path := SaveGame.write("打仗中", w, Clock.new(day), {})
+	var w2 := World.from_save(SaveGame.read(path).world)
+	eq(_war_digest(w2), _war_digest(w), "读回来一样")
+	for i in 400:
+		day += 1
+		w.advance(1, day)
+		w2.advance(1, day)
+	eq(_war_digest(w2), _war_digest(w), "接着走 400 天还一样")

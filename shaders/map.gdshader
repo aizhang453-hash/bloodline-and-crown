@@ -1,6 +1,7 @@
 // 地图着色器: 领地图 (provinces) 每个像素是领地编号, 按 lookup 表上色。
 // lookup 表第 0 行: 编号 -> 颜色; 第 1 行: 编号 -> 属于哪一组 (国家 / 公国 / 王国), 组和组之间画粗线;
 // 第 2 行: 编号 -> 这块地的主人 (第 5 块: 同一个国家里不同主人的地之间画一条细一点的线, 学三代分出封臣)。
+// 第 3 行: 编号 -> 占领它的一方的颜色 (第 6 块: 被占领的地画斜条纹, 跟三代一样; 没被占领 alpha 是 0)。
 shader_type canvas_item;
 
 uniform sampler2D provinces : filter_nearest;
@@ -49,6 +50,11 @@ void fragment() {
 		COLOR = vec4(sea_color.rgb * (0.94 + 0.1 * grain), 1.0);
 	} else {
 		vec3 col = texelFetch(lookup, ivec2(id, 0), 0).rgb;
+		vec4 occ = texelFetch(lookup, ivec2(id, 3), 0);
+		if (occ.a > 0.5) {
+			float stripe = step(0.5, fract((tp.x + tp.y) / (s * 16.0)));
+			col = mix(col, occ.rgb, stripe * 0.85);
+		}
 		col *= 0.9 + 0.14 * grain;
 		int g = group_of(id);
 		int lord = lord_of(id);

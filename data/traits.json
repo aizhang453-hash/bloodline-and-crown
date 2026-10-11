@@ -1,94 +1,1048 @@
 {
- "说明": "人物的特点 (第 2 块, 照三代的分法, 名字和数字是我们自己定的, 试玩再调)。skills 是加减哪项本事 (all = 六项都加); health 是加减健康; opinion 是别人对他的好感加减。性格一样的人互相 +10, 相反的互相 -10。 inherit 是爸妈一个有这个天生特点时孩子也有的机会 (百分之几, 两个都有翻倍; 第 4 块)。childhood 是 3 岁有的「小时候的性格」(照三代的五种): focus 是学哪样学得好, grows_into 是长大以后容易有的性格。",
+ "说明": "人物的特点 (第 2 块, 照三代的分法, 名字和数字是我们自己定的, 试玩再调)。skills 是加减哪项本事 (all = 六项都加); health 是加减健康; opinion 是别人对他的好感加减。性格一样的人互相 +10, 相反的互相 -10。 inherit 是爸妈一个有这个天生特点时孩子也有的机会 (百分之几, 两个都有翻倍; 第 4 块)。childhood 是 3 岁有的「小时候的性格」(照三代的五种): focus 是学哪样学得好, grows_into 是长大以后容易有的性格。 coping 是压力崩溃时染上的排解压力的毛病 (第 8 块, 照三代): 每个让压力降得快 20%, 带一个解压的决议 (decision: 名字、说明、降多少压力、三年一次); stress 是崩溃得重了才有的特点 (忧郁、疯癫)。",
  "skills": [
-  {"id": "diplomacy", "name": "外交", "icon": "s_diplomacy", "desc": "跟人打交道。以后管别人对你的好感、结盟、拉拢"},
-  {"id": "martial", "name": "军事", "icon": "s_martial", "desc": "带兵打仗。以后管军队打得好不好"},
-  {"id": "stewardship", "name": "管理", "icon": "s_stewardship", "desc": "管领地、管钱。以后管收多少税、能亲自管几块领地"},
-  {"id": "intrigue", "name": "密谋", "icon": "s_intrigue", "desc": "搞阴谋、防阴谋。以后管暗杀、抓把柄"},
-  {"id": "learning", "name": "学识", "icon": "s_learning", "desc": "读书、信仰、懂医术。以后管宗教和科技"},
-  {"id": "prowess", "name": "武力", "icon": "s_prowess", "desc": "自己的拳脚功夫。以后管自己上阵、决斗"}
+  {
+   "id": "diplomacy",
+   "name": "外交",
+   "icon": "s_diplomacy",
+   "desc": "跟人打交道。以后管别人对你的好感、结盟、拉拢"
+  },
+  {
+   "id": "martial",
+   "name": "军事",
+   "icon": "s_martial",
+   "desc": "带兵打仗。以后管军队打得好不好"
+  },
+  {
+   "id": "stewardship",
+   "name": "管理",
+   "icon": "s_stewardship",
+   "desc": "管领地、管钱。以后管收多少税、能亲自管几块领地"
+  },
+  {
+   "id": "intrigue",
+   "name": "密谋",
+   "icon": "s_intrigue",
+   "desc": "搞阴谋、防阴谋。以后管暗杀、抓把柄"
+  },
+  {
+   "id": "learning",
+   "name": "学识",
+   "icon": "s_learning",
+   "desc": "读书、信仰、懂医术。以后管宗教和科技"
+  },
+  {
+   "id": "prowess",
+   "name": "武力",
+   "icon": "s_prowess",
+   "desc": "自己的拳脚功夫。以后管自己上阵、决斗"
+  }
  ],
  "personality": [
-  {"id": "brave", "name": "勇敢", "opposite": ["craven"], "skills": {"martial": 2, "prowess": 3}, "desc": "不怕危险, 敢冲在前面"},
-  {"id": "craven", "name": "怯懦", "opposite": ["brave"], "skills": {"martial": -2, "prowess": -3, "intrigue": 2}, "desc": "胆小, 遇事先想着保命"},
-  {"id": "calm", "name": "冷静", "opposite": ["wrathful"], "skills": {"diplomacy": 1, "intrigue": 1}, "desc": "遇事不慌, 压力降得快"},
-  {"id": "wrathful", "name": "易怒", "opposite": ["calm"], "skills": {"martial": 3, "diplomacy": -1, "intrigue": -1}, "desc": "脾气暴, 一点就着"},
-  {"id": "chaste", "name": "贞洁", "opposite": ["lustful"], "skills": {"learning": 2}, "desc": "清心寡欲"},
-  {"id": "lustful", "name": "好色", "opposite": ["chaste"], "skills": {"intrigue": 2}, "desc": "贪恋美色"},
-  {"id": "content", "name": "知足", "opposite": ["ambitious"], "skills": {"learning": 2, "intrigue": -1}, "desc": "对现在的日子很满意"},
-  {"id": "ambitious", "name": "野心勃勃", "opposite": ["content"], "skills": {"all": 1}, "desc": "想要更多的权力和领地"},
-  {"id": "diligent", "name": "勤奋", "opposite": ["lazy"], "skills": {"all": 1}, "desc": "做事认真, 不偷懒"},
-  {"id": "lazy", "name": "懒惰", "opposite": ["diligent"], "skills": {"all": -1}, "desc": "能不动就不动"},
-  {"id": "forgiving", "name": "宽恕", "opposite": ["vengeful"], "skills": {"diplomacy": 2, "learning": 1, "intrigue": -2}, "desc": "别人对不起他, 过去就算了"},
-  {"id": "vengeful", "name": "记仇", "opposite": ["forgiving"], "skills": {"intrigue": 2, "martial": 2, "diplomacy": -2}, "desc": "有仇必报"},
-  {"id": "generous", "name": "慷慨", "opposite": ["greedy"], "skills": {"diplomacy": 3}, "desc": "舍得给别人好处"},
-  {"id": "greedy", "name": "贪婪", "opposite": ["generous"], "skills": {"stewardship": 2, "diplomacy": -2}, "desc": "钱越多越好"},
-  {"id": "gregarious", "name": "外向", "opposite": ["shy"], "skills": {"diplomacy": 2}, "desc": "喜欢热闹, 爱跟人来往"},
-  {"id": "shy", "name": "害羞", "opposite": ["gregarious"], "skills": {"diplomacy": -2, "learning": 1}, "desc": "不爱见人"},
-  {"id": "honest", "name": "诚实", "opposite": ["deceitful"], "skills": {"diplomacy": 2, "intrigue": -4}, "desc": "不说假话"},
-  {"id": "deceitful", "name": "狡诈", "opposite": ["honest"], "skills": {"intrigue": 4, "diplomacy": -2}, "desc": "说一套做一套"},
-  {"id": "humble", "name": "谦逊", "opposite": ["arrogant"], "skills": {"diplomacy": 1, "learning": 1}, "desc": "不摆架子"},
-  {"id": "arrogant", "name": "傲慢", "opposite": ["humble"], "skills": {"martial": 1, "diplomacy": -1}, "desc": "看不起别人"},
-  {"id": "just", "name": "公正", "opposite": ["arbitrary"], "skills": {"stewardship": 2, "learning": 1, "intrigue": -3}, "desc": "按规矩办事, 一碗水端平"},
-  {"id": "arbitrary", "name": "专断", "opposite": ["just"], "skills": {"intrigue": 2, "stewardship": -1, "learning": -1}, "desc": "想怎么来就怎么来"},
-  {"id": "patient", "name": "耐心", "opposite": ["impatient"], "skills": {"learning": 2}, "desc": "等得起"},
-  {"id": "impatient", "name": "急躁", "opposite": ["patient"], "skills": {"learning": -1, "intrigue": 1}, "desc": "等不及"},
-  {"id": "temperate", "name": "节制", "opposite": ["gluttonous"], "skills": {"stewardship": 2}, "health": 0.25, "desc": "吃喝有度"},
-  {"id": "gluttonous", "name": "贪吃", "opposite": ["temperate"], "skills": {"stewardship": -2}, "health": -0.25, "desc": "大吃大喝"},
-  {"id": "trusting", "name": "轻信", "opposite": ["paranoid"], "skills": {"diplomacy": 2, "intrigue": -2}, "desc": "容易相信别人"},
-  {"id": "paranoid", "name": "多疑", "opposite": ["trusting"], "skills": {"intrigue": 3, "diplomacy": -1}, "desc": "总觉得有人要害他"},
-  {"id": "zealous", "name": "虔信", "opposite": ["cynical"], "skills": {"martial": 1, "learning": 1}, "desc": "信仰很虔诚"},
-  {"id": "cynical", "name": "愤世", "opposite": ["zealous"], "skills": {"intrigue": 2, "learning": 1}, "desc": "什么都不太信"},
-  {"id": "compassionate", "name": "仁慈", "opposite": ["callous", "sadistic"], "skills": {"diplomacy": 2, "intrigue": -2}, "desc": "心软, 见不得别人受苦"},
-  {"id": "callous", "name": "冷酷", "opposite": ["compassionate", "sadistic"], "skills": {"intrigue": 2, "diplomacy": -2}, "desc": "别人受不受苦跟他没关系"},
-  {"id": "sadistic", "name": "残忍", "opposite": ["compassionate", "callous"], "skills": {"intrigue": 2, "prowess": 2, "diplomacy": -3}, "desc": "喜欢看别人受苦"},
-  {"id": "stubborn", "name": "固执", "opposite": ["fickle"], "skills": {"stewardship": 2}, "desc": "认准了就不改"},
-  {"id": "fickle", "name": "善变", "opposite": ["stubborn"], "skills": {"diplomacy": 2, "stewardship": -2}, "desc": "今天这样明天那样"},
-  {"id": "eccentric", "name": "古怪", "opposite": [], "skills": {"learning": 2, "diplomacy": -2}, "desc": "想法跟别人不一样"}
+  {
+   "id": "brave",
+   "name": "勇敢",
+   "opposite": [
+    "craven"
+   ],
+   "skills": {
+    "martial": 2,
+    "prowess": 3
+   },
+   "desc": "不怕危险, 敢冲在前面"
+  },
+  {
+   "id": "craven",
+   "name": "怯懦",
+   "opposite": [
+    "brave"
+   ],
+   "skills": {
+    "martial": -2,
+    "prowess": -3,
+    "intrigue": 2
+   },
+   "desc": "胆小, 遇事先想着保命"
+  },
+  {
+   "id": "calm",
+   "name": "冷静",
+   "opposite": [
+    "wrathful"
+   ],
+   "skills": {
+    "diplomacy": 1,
+    "intrigue": 1
+   },
+   "desc": "遇事不慌, 压力降得快"
+  },
+  {
+   "id": "wrathful",
+   "name": "易怒",
+   "opposite": [
+    "calm"
+   ],
+   "skills": {
+    "martial": 3,
+    "diplomacy": -1,
+    "intrigue": -1
+   },
+   "desc": "脾气暴, 一点就着"
+  },
+  {
+   "id": "chaste",
+   "name": "贞洁",
+   "opposite": [
+    "lustful"
+   ],
+   "skills": {
+    "learning": 2
+   },
+   "desc": "清心寡欲"
+  },
+  {
+   "id": "lustful",
+   "name": "好色",
+   "opposite": [
+    "chaste"
+   ],
+   "skills": {
+    "intrigue": 2
+   },
+   "desc": "贪恋美色"
+  },
+  {
+   "id": "content",
+   "name": "知足",
+   "opposite": [
+    "ambitious"
+   ],
+   "skills": {
+    "learning": 2,
+    "intrigue": -1
+   },
+   "desc": "对现在的日子很满意"
+  },
+  {
+   "id": "ambitious",
+   "name": "野心勃勃",
+   "opposite": [
+    "content"
+   ],
+   "skills": {
+    "all": 1
+   },
+   "desc": "想要更多的权力和领地"
+  },
+  {
+   "id": "diligent",
+   "name": "勤奋",
+   "opposite": [
+    "lazy"
+   ],
+   "skills": {
+    "all": 1
+   },
+   "desc": "做事认真, 不偷懒"
+  },
+  {
+   "id": "lazy",
+   "name": "懒惰",
+   "opposite": [
+    "diligent"
+   ],
+   "skills": {
+    "all": -1
+   },
+   "desc": "能不动就不动"
+  },
+  {
+   "id": "forgiving",
+   "name": "宽恕",
+   "opposite": [
+    "vengeful"
+   ],
+   "skills": {
+    "diplomacy": 2,
+    "learning": 1,
+    "intrigue": -2
+   },
+   "desc": "别人对不起他, 过去就算了"
+  },
+  {
+   "id": "vengeful",
+   "name": "记仇",
+   "opposite": [
+    "forgiving"
+   ],
+   "skills": {
+    "intrigue": 2,
+    "martial": 2,
+    "diplomacy": -2
+   },
+   "desc": "有仇必报"
+  },
+  {
+   "id": "generous",
+   "name": "慷慨",
+   "opposite": [
+    "greedy"
+   ],
+   "skills": {
+    "diplomacy": 3
+   },
+   "desc": "舍得给别人好处"
+  },
+  {
+   "id": "greedy",
+   "name": "贪婪",
+   "opposite": [
+    "generous"
+   ],
+   "skills": {
+    "stewardship": 2,
+    "diplomacy": -2
+   },
+   "desc": "钱越多越好"
+  },
+  {
+   "id": "gregarious",
+   "name": "外向",
+   "opposite": [
+    "shy"
+   ],
+   "skills": {
+    "diplomacy": 2
+   },
+   "desc": "喜欢热闹, 爱跟人来往"
+  },
+  {
+   "id": "shy",
+   "name": "害羞",
+   "opposite": [
+    "gregarious"
+   ],
+   "skills": {
+    "diplomacy": -2,
+    "learning": 1
+   },
+   "desc": "不爱见人"
+  },
+  {
+   "id": "honest",
+   "name": "诚实",
+   "opposite": [
+    "deceitful"
+   ],
+   "skills": {
+    "diplomacy": 2,
+    "intrigue": -4
+   },
+   "desc": "不说假话"
+  },
+  {
+   "id": "deceitful",
+   "name": "狡诈",
+   "opposite": [
+    "honest"
+   ],
+   "skills": {
+    "intrigue": 4,
+    "diplomacy": -2
+   },
+   "desc": "说一套做一套"
+  },
+  {
+   "id": "humble",
+   "name": "谦逊",
+   "opposite": [
+    "arrogant"
+   ],
+   "skills": {
+    "diplomacy": 1,
+    "learning": 1
+   },
+   "desc": "不摆架子"
+  },
+  {
+   "id": "arrogant",
+   "name": "傲慢",
+   "opposite": [
+    "humble"
+   ],
+   "skills": {
+    "martial": 1,
+    "diplomacy": -1
+   },
+   "desc": "看不起别人"
+  },
+  {
+   "id": "just",
+   "name": "公正",
+   "opposite": [
+    "arbitrary"
+   ],
+   "skills": {
+    "stewardship": 2,
+    "learning": 1,
+    "intrigue": -3
+   },
+   "desc": "按规矩办事, 一碗水端平"
+  },
+  {
+   "id": "arbitrary",
+   "name": "专断",
+   "opposite": [
+    "just"
+   ],
+   "skills": {
+    "intrigue": 2,
+    "stewardship": -1,
+    "learning": -1
+   },
+   "desc": "想怎么来就怎么来"
+  },
+  {
+   "id": "patient",
+   "name": "耐心",
+   "opposite": [
+    "impatient"
+   ],
+   "skills": {
+    "learning": 2
+   },
+   "desc": "等得起"
+  },
+  {
+   "id": "impatient",
+   "name": "急躁",
+   "opposite": [
+    "patient"
+   ],
+   "skills": {
+    "learning": -1,
+    "intrigue": 1
+   },
+   "desc": "等不及"
+  },
+  {
+   "id": "temperate",
+   "name": "节制",
+   "opposite": [
+    "gluttonous"
+   ],
+   "skills": {
+    "stewardship": 2
+   },
+   "health": 0.25,
+   "desc": "吃喝有度"
+  },
+  {
+   "id": "gluttonous",
+   "name": "贪吃",
+   "opposite": [
+    "temperate"
+   ],
+   "skills": {
+    "stewardship": -2
+   },
+   "health": -0.25,
+   "desc": "大吃大喝"
+  },
+  {
+   "id": "trusting",
+   "name": "轻信",
+   "opposite": [
+    "paranoid"
+   ],
+   "skills": {
+    "diplomacy": 2,
+    "intrigue": -2
+   },
+   "desc": "容易相信别人"
+  },
+  {
+   "id": "paranoid",
+   "name": "多疑",
+   "opposite": [
+    "trusting"
+   ],
+   "skills": {
+    "intrigue": 3,
+    "diplomacy": -1
+   },
+   "desc": "总觉得有人要害他"
+  },
+  {
+   "id": "zealous",
+   "name": "虔信",
+   "opposite": [
+    "cynical"
+   ],
+   "skills": {
+    "martial": 1,
+    "learning": 1
+   },
+   "desc": "信仰很虔诚"
+  },
+  {
+   "id": "cynical",
+   "name": "愤世",
+   "opposite": [
+    "zealous"
+   ],
+   "skills": {
+    "intrigue": 2,
+    "learning": 1
+   },
+   "desc": "什么都不太信"
+  },
+  {
+   "id": "compassionate",
+   "name": "仁慈",
+   "opposite": [
+    "callous",
+    "sadistic"
+   ],
+   "skills": {
+    "diplomacy": 2,
+    "intrigue": -2
+   },
+   "desc": "心软, 见不得别人受苦"
+  },
+  {
+   "id": "callous",
+   "name": "冷酷",
+   "opposite": [
+    "compassionate",
+    "sadistic"
+   ],
+   "skills": {
+    "intrigue": 2,
+    "diplomacy": -2
+   },
+   "desc": "别人受不受苦跟他没关系"
+  },
+  {
+   "id": "sadistic",
+   "name": "残忍",
+   "opposite": [
+    "compassionate",
+    "callous"
+   ],
+   "skills": {
+    "intrigue": 2,
+    "prowess": 2,
+    "diplomacy": -3
+   },
+   "desc": "喜欢看别人受苦"
+  },
+  {
+   "id": "stubborn",
+   "name": "固执",
+   "opposite": [
+    "fickle"
+   ],
+   "skills": {
+    "stewardship": 2
+   },
+   "desc": "认准了就不改"
+  },
+  {
+   "id": "fickle",
+   "name": "善变",
+   "opposite": [
+    "stubborn"
+   ],
+   "skills": {
+    "diplomacy": 2,
+    "stewardship": -2
+   },
+   "desc": "今天这样明天那样"
+  },
+  {
+   "id": "eccentric",
+   "name": "古怪",
+   "opposite": [],
+   "skills": {
+    "learning": 2,
+    "diplomacy": -2
+   },
+   "desc": "想法跟别人不一样"
+  }
  ],
  "education": {
-  "levels": ["差", "一般", "好", "出色"],
-  "bonus": [1, 3, 5, 7],
-  "odds": [25, 40, 25, 10],
+  "levels": [
+   "差",
+   "一般",
+   "好",
+   "出色"
+  ],
+  "bonus": [
+   1,
+   3,
+   5,
+   7
+  ],
+  "odds": [
+   25,
+   40,
+   25,
+   10
+  ],
   "tracks": [
-   {"skill": "diplomacy", "name": "外交教育", "desc": "从小学怎么跟人打交道"},
-   {"skill": "martial", "name": "军事教育", "desc": "从小学带兵打仗"},
-   {"skill": "stewardship", "name": "管理教育", "desc": "从小学管领地、管钱"},
-   {"skill": "intrigue", "name": "密谋教育", "desc": "从小学察言观色、暗中行事"},
-   {"skill": "learning", "name": "学识教育", "desc": "从小读书 (多半跟着教士学)"}
+   {
+    "skill": "diplomacy",
+    "name": "外交教育",
+    "desc": "从小学怎么跟人打交道"
+   },
+   {
+    "skill": "martial",
+    "name": "军事教育",
+    "desc": "从小学带兵打仗"
+   },
+   {
+    "skill": "stewardship",
+    "name": "管理教育",
+    "desc": "从小学管领地、管钱"
+   },
+   {
+    "skill": "intrigue",
+    "name": "密谋教育",
+    "desc": "从小学察言观色、暗中行事"
+   },
+   {
+    "skill": "learning",
+    "name": "学识教育",
+    "desc": "从小读书 (多半跟着教士学)"
+   }
   ]
  },
  "congenital": [
-  {"id": "intellect_good_1", "group": "intellect", "name": "聪明", "good": true, "chance": 4, "skills": {"diplomacy": 2, "martial": 2, "stewardship": 2, "intrigue": 2, "learning": 2}, "desc": "脑子比别人快", "inherit": 25},
-  {"id": "intellect_good_2", "group": "intellect", "name": "很聪明", "good": true, "chance": 1.5, "skills": {"diplomacy": 4, "martial": 4, "stewardship": 4, "intrigue": 4, "learning": 4}, "desc": "一学就会", "inherit": 25},
-  {"id": "intellect_good_3", "group": "intellect", "name": "天才", "good": true, "chance": 0.4, "skills": {"diplomacy": 6, "martial": 6, "stewardship": 6, "intrigue": 6, "learning": 6}, "desc": "百年难遇的聪明人", "inherit": 25},
-  {"id": "intellect_bad_1", "group": "intellect", "name": "迟钝", "good": false, "chance": 4, "skills": {"diplomacy": -2, "martial": -2, "stewardship": -2, "intrigue": -2, "learning": -2}, "desc": "脑子慢一点", "inherit": 25},
-  {"id": "intellect_bad_2", "group": "intellect", "name": "愚笨", "good": false, "chance": 1.5, "skills": {"diplomacy": -4, "martial": -4, "stewardship": -4, "intrigue": -4, "learning": -4}, "desc": "怎么教都学不会", "inherit": 25},
-  {"id": "intellect_bad_3", "group": "intellect", "name": "痴愚", "good": false, "chance": 0.4, "skills": {"diplomacy": -6, "martial": -6, "stewardship": -6, "intrigue": -6, "learning": -6}, "desc": "生下来就不太明白事", "inherit": 25},
-  {"id": "beauty_good_1", "group": "beauty", "name": "好看", "good": true, "chance": 4, "skills": {"diplomacy": 1}, "opinion": 5, "desc": "长得讨人喜欢", "inherit": 25},
-  {"id": "beauty_good_2", "group": "beauty", "name": "美貌", "good": true, "chance": 1.5, "skills": {"diplomacy": 2}, "opinion": 10, "desc": "人人都夸长得好", "inherit": 25},
-  {"id": "beauty_good_3", "group": "beauty", "name": "绝色", "good": true, "chance": 0.4, "skills": {"diplomacy": 3}, "opinion": 15, "desc": "远近闻名的好相貌", "inherit": 25},
-  {"id": "beauty_bad_1", "group": "beauty", "name": "其貌不扬", "good": false, "chance": 4, "skills": {"diplomacy": -1}, "opinion": -5, "desc": "长得不太好看", "inherit": 25},
-  {"id": "beauty_bad_2", "group": "beauty", "name": "难看", "good": false, "chance": 1.5, "skills": {"diplomacy": -2}, "opinion": -10, "desc": "长得难看", "inherit": 25},
-  {"id": "beauty_bad_3", "group": "beauty", "name": "丑陋", "good": false, "chance": 0.4, "skills": {"diplomacy": -3}, "opinion": -15, "desc": "见了的人都吓一跳", "inherit": 25},
-  {"id": "physique_good_1", "group": "physique", "name": "结实", "good": true, "chance": 4, "skills": {"prowess": 3}, "health": 0.5, "desc": "身子骨结实", "inherit": 25},
-  {"id": "physique_good_2", "group": "physique", "name": "强壮", "good": true, "chance": 1.5, "skills": {"prowess": 5}, "health": 1.0, "desc": "力气大, 很少生病", "inherit": 25},
-  {"id": "physique_good_3", "group": "physique", "name": "力大无穷", "good": true, "chance": 0.4, "skills": {"prowess": 7}, "health": 1.5, "desc": "像传说里的英雄一样壮", "inherit": 25},
-  {"id": "physique_bad_1", "group": "physique", "name": "瘦弱", "good": false, "chance": 4, "skills": {"prowess": -3}, "health": -0.5, "desc": "身子单薄", "inherit": 25},
-  {"id": "physique_bad_2", "group": "physique", "name": "虚弱", "good": false, "chance": 1.5, "skills": {"prowess": -5}, "health": -1.0, "desc": "动不动就生病", "inherit": 25},
-  {"id": "physique_bad_3", "group": "physique", "name": "病弱", "good": false, "chance": 0.4, "skills": {"prowess": -7}, "health": -1.5, "desc": "一辈子病恹恹的", "inherit": 25},
-  {"id": "giant", "group": "height", "name": "高大", "good": true, "chance": 0.6, "skills": {"prowess": 6}, "health": -0.5, "desc": "比别人高一个头", "inherit": 10},
-  {"id": "dwarf", "group": "height", "name": "矮小", "good": false, "chance": 0.6, "skills": {"prowess": -4}, "opinion": -10, "desc": "个子特别矮", "inherit": 10},
-  {"id": "clubfooted", "group": "clubfooted", "name": "跛脚", "good": false, "chance": 1, "skills": {"prowess": -2}, "opinion": -5, "desc": "生下来脚就是歪的", "inherit": 0},
-  {"id": "hunchbacked", "group": "hunchbacked", "name": "驼背", "good": false, "chance": 1, "skills": {"prowess": -2}, "opinion": -10, "desc": "背是弯的", "inherit": 10},
-  {"id": "stuttering", "group": "stuttering", "name": "口吃", "good": false, "chance": 2, "skills": {"diplomacy": -2}, "desc": "说话结巴", "inherit": 0},
-  {"id": "inbred", "group": "inbred", "name": "近亲繁殖", "good": false, "chance": 0, "inherit": 0, "skills": {"all": -2}, "health": -1.0, "opinion": -5, "desc": "爸爸妈妈是近亲, 生下来体弱多病"}
+  {
+   "id": "intellect_good_1",
+   "group": "intellect",
+   "name": "聪明",
+   "good": true,
+   "chance": 4,
+   "skills": {
+    "diplomacy": 2,
+    "martial": 2,
+    "stewardship": 2,
+    "intrigue": 2,
+    "learning": 2
+   },
+   "desc": "脑子比别人快",
+   "inherit": 25
+  },
+  {
+   "id": "intellect_good_2",
+   "group": "intellect",
+   "name": "很聪明",
+   "good": true,
+   "chance": 1.5,
+   "skills": {
+    "diplomacy": 4,
+    "martial": 4,
+    "stewardship": 4,
+    "intrigue": 4,
+    "learning": 4
+   },
+   "desc": "一学就会",
+   "inherit": 25
+  },
+  {
+   "id": "intellect_good_3",
+   "group": "intellect",
+   "name": "天才",
+   "good": true,
+   "chance": 0.4,
+   "skills": {
+    "diplomacy": 6,
+    "martial": 6,
+    "stewardship": 6,
+    "intrigue": 6,
+    "learning": 6
+   },
+   "desc": "百年难遇的聪明人",
+   "inherit": 25
+  },
+  {
+   "id": "intellect_bad_1",
+   "group": "intellect",
+   "name": "迟钝",
+   "good": false,
+   "chance": 4,
+   "skills": {
+    "diplomacy": -2,
+    "martial": -2,
+    "stewardship": -2,
+    "intrigue": -2,
+    "learning": -2
+   },
+   "desc": "脑子慢一点",
+   "inherit": 25
+  },
+  {
+   "id": "intellect_bad_2",
+   "group": "intellect",
+   "name": "愚笨",
+   "good": false,
+   "chance": 1.5,
+   "skills": {
+    "diplomacy": -4,
+    "martial": -4,
+    "stewardship": -4,
+    "intrigue": -4,
+    "learning": -4
+   },
+   "desc": "怎么教都学不会",
+   "inherit": 25
+  },
+  {
+   "id": "intellect_bad_3",
+   "group": "intellect",
+   "name": "痴愚",
+   "good": false,
+   "chance": 0.4,
+   "skills": {
+    "diplomacy": -6,
+    "martial": -6,
+    "stewardship": -6,
+    "intrigue": -6,
+    "learning": -6
+   },
+   "desc": "生下来就不太明白事",
+   "inherit": 25
+  },
+  {
+   "id": "beauty_good_1",
+   "group": "beauty",
+   "name": "好看",
+   "good": true,
+   "chance": 4,
+   "skills": {
+    "diplomacy": 1
+   },
+   "opinion": 5,
+   "desc": "长得讨人喜欢",
+   "inherit": 25
+  },
+  {
+   "id": "beauty_good_2",
+   "group": "beauty",
+   "name": "美貌",
+   "good": true,
+   "chance": 1.5,
+   "skills": {
+    "diplomacy": 2
+   },
+   "opinion": 10,
+   "desc": "人人都夸长得好",
+   "inherit": 25
+  },
+  {
+   "id": "beauty_good_3",
+   "group": "beauty",
+   "name": "绝色",
+   "good": true,
+   "chance": 0.4,
+   "skills": {
+    "diplomacy": 3
+   },
+   "opinion": 15,
+   "desc": "远近闻名的好相貌",
+   "inherit": 25
+  },
+  {
+   "id": "beauty_bad_1",
+   "group": "beauty",
+   "name": "其貌不扬",
+   "good": false,
+   "chance": 4,
+   "skills": {
+    "diplomacy": -1
+   },
+   "opinion": -5,
+   "desc": "长得不太好看",
+   "inherit": 25
+  },
+  {
+   "id": "beauty_bad_2",
+   "group": "beauty",
+   "name": "难看",
+   "good": false,
+   "chance": 1.5,
+   "skills": {
+    "diplomacy": -2
+   },
+   "opinion": -10,
+   "desc": "长得难看",
+   "inherit": 25
+  },
+  {
+   "id": "beauty_bad_3",
+   "group": "beauty",
+   "name": "丑陋",
+   "good": false,
+   "chance": 0.4,
+   "skills": {
+    "diplomacy": -3
+   },
+   "opinion": -15,
+   "desc": "见了的人都吓一跳",
+   "inherit": 25
+  },
+  {
+   "id": "physique_good_1",
+   "group": "physique",
+   "name": "结实",
+   "good": true,
+   "chance": 4,
+   "skills": {
+    "prowess": 3
+   },
+   "health": 0.5,
+   "desc": "身子骨结实",
+   "inherit": 25
+  },
+  {
+   "id": "physique_good_2",
+   "group": "physique",
+   "name": "强壮",
+   "good": true,
+   "chance": 1.5,
+   "skills": {
+    "prowess": 5
+   },
+   "health": 1.0,
+   "desc": "力气大, 很少生病",
+   "inherit": 25
+  },
+  {
+   "id": "physique_good_3",
+   "group": "physique",
+   "name": "力大无穷",
+   "good": true,
+   "chance": 0.4,
+   "skills": {
+    "prowess": 7
+   },
+   "health": 1.5,
+   "desc": "像传说里的英雄一样壮",
+   "inherit": 25
+  },
+  {
+   "id": "physique_bad_1",
+   "group": "physique",
+   "name": "瘦弱",
+   "good": false,
+   "chance": 4,
+   "skills": {
+    "prowess": -3
+   },
+   "health": -0.5,
+   "desc": "身子单薄",
+   "inherit": 25
+  },
+  {
+   "id": "physique_bad_2",
+   "group": "physique",
+   "name": "虚弱",
+   "good": false,
+   "chance": 1.5,
+   "skills": {
+    "prowess": -5
+   },
+   "health": -1.0,
+   "desc": "动不动就生病",
+   "inherit": 25
+  },
+  {
+   "id": "physique_bad_3",
+   "group": "physique",
+   "name": "病弱",
+   "good": false,
+   "chance": 0.4,
+   "skills": {
+    "prowess": -7
+   },
+   "health": -1.5,
+   "desc": "一辈子病恹恹的",
+   "inherit": 25
+  },
+  {
+   "id": "giant",
+   "group": "height",
+   "name": "高大",
+   "good": true,
+   "chance": 0.6,
+   "skills": {
+    "prowess": 6
+   },
+   "health": -0.5,
+   "desc": "比别人高一个头",
+   "inherit": 10
+  },
+  {
+   "id": "dwarf",
+   "group": "height",
+   "name": "矮小",
+   "good": false,
+   "chance": 0.6,
+   "skills": {
+    "prowess": -4
+   },
+   "opinion": -10,
+   "desc": "个子特别矮",
+   "inherit": 10
+  },
+  {
+   "id": "clubfooted",
+   "group": "clubfooted",
+   "name": "跛脚",
+   "good": false,
+   "chance": 1,
+   "skills": {
+    "prowess": -2
+   },
+   "opinion": -5,
+   "desc": "生下来脚就是歪的",
+   "inherit": 0
+  },
+  {
+   "id": "hunchbacked",
+   "group": "hunchbacked",
+   "name": "驼背",
+   "good": false,
+   "chance": 1,
+   "skills": {
+    "prowess": -2
+   },
+   "opinion": -10,
+   "desc": "背是弯的",
+   "inherit": 10
+  },
+  {
+   "id": "stuttering",
+   "group": "stuttering",
+   "name": "口吃",
+   "good": false,
+   "chance": 2,
+   "skills": {
+    "diplomacy": -2
+   },
+   "desc": "说话结巴",
+   "inherit": 0
+  },
+  {
+   "id": "inbred",
+   "group": "inbred",
+   "name": "近亲繁殖",
+   "good": false,
+   "chance": 0,
+   "inherit": 0,
+   "skills": {
+    "all": -2
+   },
+   "health": -1.0,
+   "opinion": -5,
+   "desc": "爸爸妈妈是近亲, 生下来体弱多病"
+  }
  ],
  "childhood": [
-  {"id": "rowdy", "name": "淘气", "focus": ["martial"], "grows_into": ["brave", "wrathful", "impatient"], "desc": "整天爬树、打架, 一刻也闲不住"},
-  {"id": "charming", "name": "讨人喜欢", "focus": ["diplomacy"], "grows_into": ["gregarious", "generous", "fickle"], "desc": "嘴甜, 大人都喜欢他"},
-  {"id": "curious", "name": "好奇", "focus": ["intrigue", "learning"], "grows_into": ["eccentric", "diligent", "cynical"], "desc": "什么都要问个为什么, 到处翻东西"},
-  {"id": "pensive", "name": "爱琢磨", "focus": ["learning", "stewardship"], "grows_into": ["patient", "shy", "calm"], "desc": "爱一个人坐着想事情"},
-  {"id": "bossy", "name": "爱管人", "focus": ["stewardship", "martial"], "grows_into": ["arrogant", "ambitious", "stubborn"], "desc": "跟别的孩子玩总要当头"}
+  {
+   "id": "rowdy",
+   "name": "淘气",
+   "focus": [
+    "martial"
+   ],
+   "grows_into": [
+    "brave",
+    "wrathful",
+    "impatient"
+   ],
+   "desc": "整天爬树、打架, 一刻也闲不住"
+  },
+  {
+   "id": "charming",
+   "name": "讨人喜欢",
+   "focus": [
+    "diplomacy"
+   ],
+   "grows_into": [
+    "gregarious",
+    "generous",
+    "fickle"
+   ],
+   "desc": "嘴甜, 大人都喜欢他"
+  },
+  {
+   "id": "curious",
+   "name": "好奇",
+   "focus": [
+    "intrigue",
+    "learning"
+   ],
+   "grows_into": [
+    "eccentric",
+    "diligent",
+    "cynical"
+   ],
+   "desc": "什么都要问个为什么, 到处翻东西"
+  },
+  {
+   "id": "pensive",
+   "name": "爱琢磨",
+   "focus": [
+    "learning",
+    "stewardship"
+   ],
+   "grows_into": [
+    "patient",
+    "shy",
+    "calm"
+   ],
+   "desc": "爱一个人坐着想事情"
+  },
+  {
+   "id": "bossy",
+   "name": "爱管人",
+   "focus": [
+    "stewardship",
+    "martial"
+   ],
+   "grows_into": [
+    "arrogant",
+    "ambitious",
+    "stubborn"
+   ],
+   "desc": "跟别的孩子玩总要当头"
+  }
+ ],
+ "coping": [
+  {
+   "id": "drunkard",
+   "name": "酗酒",
+   "desc": "心里烦就喝酒, 一喝就停不下来",
+   "decision": {
+    "name": "喝个痛快",
+    "desc": "关起门来喝上几天几夜",
+    "stress": 60,
+    "health": -0.5,
+    "health_chance": 0.25
+   }
+  },
+  {
+   "id": "flagellant",
+   "name": "苦修",
+   "desc": "用鞭子抽打自己, 觉得这样能赎罪",
+   "decision": {
+    "name": "鞭打自己赎罪",
+    "desc": "跪在祭坛前, 用鞭子抽打自己的后背",
+    "stress": 50,
+    "health": -0.5,
+    "health_chance": 0.3
+   }
+  },
+  {
+   "id": "comfort_eater",
+   "name": "暴饮暴食",
+   "desc": "心里一不痛快就大吃大喝",
+   "decision": {
+    "name": "大吃一顿",
+    "desc": "叫厨房把好吃的都端上来",
+    "stress": 50,
+    "gold": -10
+   }
+  },
+  {
+   "id": "inappetetic",
+   "name": "茶饭不思",
+   "desc": "心事重重, 吃不下饭",
+   "decision": {
+    "name": "独自静坐",
+    "desc": "一个人坐着, 什么也不吃, 慢慢想通",
+    "stress": 40
+   }
+  },
+  {
+   "id": "reclusive",
+   "name": "闭门不出",
+   "desc": "躲着人, 不愿意见客",
+   "decision": {
+    "name": "闭门谢客",
+    "desc": "谁也不见, 一个人待一阵子",
+    "stress": 60,
+    "prestige": -10
+   }
+  },
+  {
+   "id": "profligate",
+   "name": "乱花钱",
+   "desc": "一不痛快就大把花钱",
+   "decision": {
+    "name": "挥霍一番",
+    "desc": "买下一堆用不着的好东西",
+    "stress": 60,
+    "gold": -30
+   }
+  },
+  {
+   "id": "journaller",
+   "name": "写日记",
+   "desc": "把心事一笔一笔写下来",
+   "decision": {
+    "name": "把心事写下来",
+    "desc": "点上蜡烛, 写满几页羊皮纸",
+    "stress": 40
+   }
+  },
+  {
+   "id": "confider",
+   "name": "找人倾诉",
+   "desc": "有心事就找亲近的人说",
+   "decision": {
+    "name": "找人说说心里话",
+    "desc": "跟亲近的人把憋着的话都说出来",
+    "stress": 50
+   }
+  },
+  {
+   "id": "athletic",
+   "name": "拼命练武",
+   "desc": "心里烦就去练武, 练到筋疲力尽",
+   "skills": {
+    "prowess": 1
+   },
+   "decision": {
+    "name": "练到筋疲力尽",
+    "desc": "拿起木剑和盾, 一直练到天黑",
+    "stress": 50,
+    "health": -0.5,
+    "health_chance": 0.1
+   }
+  }
+ ],
+ "stress": [
+  {
+   "id": "melancholic",
+   "name": "忧郁",
+   "skills": {
+    "diplomacy": -1,
+    "stewardship": -1
+   },
+   "desc": "整天闷闷不乐, 什么都提不起劲"
+  },
+  {
+   "id": "lunatic",
+   "name": "疯癫",
+   "skills": {
+    "diplomacy": -2,
+    "learning": -1
+   },
+   "opinion": -10,
+   "desc": "疯疯癫癫, 有时候说胡话、做怪事"
+  }
  ]
 }

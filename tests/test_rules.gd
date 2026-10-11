@@ -8,7 +8,7 @@ func after_each() -> void:
 
 func test_defaults() -> void:
 	var w := World.load_867(1)
-	eq(w.rules, {"generate_families": "on", "ironman": "off", "child_death": "normal", "history": "on"})
+	eq(w.rules, {"generate_families": "on", "ironman": "off", "child_death": "normal", "history": "on", "wars": "on"})
 
 
 func test_generate_families_off() -> void:
