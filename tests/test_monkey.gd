@@ -8,13 +8,17 @@ var rng := RandomNumberGenerator.new()
 
 
 func before_each() -> void:
+	SaveGame.dir = OS.get_temp_dir().path_join("bloodline_test_saves_%d" % OS.get_process_id())  # 不碰真的存档
 	main = load("res://scenes/main.tscn").instantiate()
+	main.allow_quit = false
 	(Engine.get_main_loop() as SceneTree).root.add_child(main)
 	rng.seed = 20261010
 
 
 func after_each() -> void:
 	main.free()
+	for file in DirAccess.get_files_at(SaveGame.dir) if DirAccess.dir_exists_absolute(SaveGame.dir) else []:
+		DirAccess.remove_absolute(SaveGame.dir.path_join(file))
 
 
 func test_random_play() -> void:
@@ -29,7 +33,7 @@ func test_random_play() -> void:
 			0, 1:
 				_click_map(map, p)
 			2:
-				var all: Array = hud._spots + hud._county_spots + hud._person_spots + hud._window_spots + hud._popup_spots
+				var all: Array = hud._spots + hud._alert_spots + hud._county_spots + hud._person_spots + hud._window_spots + hud._popup_spots
 				all.reverse()
 				for s in all:
 					if s.visible and Rect2(s.position, s.size).has_point(p):

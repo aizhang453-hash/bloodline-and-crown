@@ -7,6 +7,11 @@ signal play_requested(realm_id: String)
 signal mode_requested(mode: int)
 signal close_requested
 signal events_happened(events: Array)  # 界面上做的事 (说亲……) 引出的事, 交给 main 处理
+signal save_requested(label: String, file: String)   # 菜单里点了存档 (file 空 = 新存一个)
+signal load_requested(path: String)
+signal quit_requested
+signal rules_changed(rules: Dictionary)   # 开局前改了开局设置 (main 用新设置重新开一局)
+signal new_game_requested                 # 铁人模式家族没了: 重新开一局
 
 # ---- 位置 (从三代截图量的) ----
 const TOP_BAR := Rect2(1222, 0, 698, 46)             # 右上角: 钱、威望、虔诚、名望、兵力、领地上限
@@ -52,11 +57,17 @@ const WIN_ROW_H := 78.0
 const WIN_ROWS := 9
 const MATCH_TABS := ["最肯答应的", "身份最高的", "本事最好的"]
 const NAME_BUTTON := Vector2(230, 46)                 # 起名窗口里一个名字的按钮
+const MENU_BOX := Rect2(610, 120, 700, 820)           # 菜单 (存档、读档)
+const MENU_ROWS := 8                                  # 存档名单一页几个
+const RULES_BUTTON := Rect2(860, 172, 200, 42)        # 开局时横幅下面的「开局设置」
 const BIRTH := Rect2(560, 180, 800, 600)              # 孩子出生、起名的窗口 (比国王去世的高, 下面有写名字的框)
 const NAME_EDIT := Rect2(600, 676, 500, 50)           # 自己写名字的框
 const NAME_OK := Rect2(1120, 676, 200, 50)            # 「就叫这个」
 const NAME_MAX := 12                                  # 名字最多几个字
 const BANNER := Rect2(560, 64, 800, 96)
+const ALERT_Y := 34.0            # 提醒那一排 (照三代的「重要事项」, 放在屏幕上方正中)
+const ALERT_R := 25.0
+const ALERT_GAP := 62.0
 
 # 右边一列: [图标, 颜色, 名字, 第几块做]
 const MENU := [
@@ -71,7 +82,7 @@ const RESOURCES := [
 	["cross", "ece6d6", "虔诚", "你对信仰有多虔诚。第 13 块「宗教」做好了才有。"],
 	["tree", "6fa04a", "名望", "整个王朝的名声。第 16 块「王朝传承」做好了才有。"],
 	["helmet", "b8c0c8", "兵力", "能召集多少兵 (直辖领地的兵 + 封臣交的兵)。第 6 块「打仗」才用得上。"],
-	["tower", "a8a090", "亲自管的领地", "自己亲手管几块领地 / 最多能管几块 (2 块 + 管理每 5 点多 1 块)。超过的不出钱、不出兵。"],
+	["tower", "a8a090", "亲自管的领地", "自己亲手管几块领地 / 最多能管几块 (基础 1 + 头衔 2 + 教育: 差 -1、好 +1、出色 +2)。超过的不出钱、不出兵。"],
 ]
 
 var world: World
@@ -104,6 +115,10 @@ var _popup_faces: Array = []
 var _notes: Array = []           # 右边的消息: [[文字, 还剩几秒], ...]
 var _stress_spot: Spot
 var _res_spots: Array = []       # 右上角六样资源的方块 (说明跟着数字变)
+var alerts: Array = []           # 现在的提醒: [{kind, icon, color, count, tip, click}]
+var _alert_spots: Array = []
+var _alert_key := ""
+var _rules_spot: Spot
 var window := {}                 # 右边的窗口: {kind: "match" 说亲 / "teacher" 教育, person, tab, page, rows}; 空 = 没开
 var _window_spots: Array = []
 var _window_faces: Array = []
@@ -170,8 +185,16 @@ func show_popup(data: Dictionary) -> void:
 		_popup_queue.append(data)
 		return
 	popup = data
-	var e: Dictionary = data.event
 	_spot(Rect2(0, 0, 1920, 1080), "", Callable(), _popup_spots)
+	if data.kind == "menu":
+		_make_menu(data)
+		redraw()
+		return
+	if data.kind == "rules":
+		_make_rules()
+		redraw()
+		return
+	var e: Dictionary = data.event
 	if data.kind == "birth":
 		_make_birth_popup(data)
 		redraw()
@@ -197,6 +220,12 @@ func close_popup() -> void:
 	if popup.is_empty():
 		return
 	var game_over: bool = popup.kind in ["game_over", "vassal_over"]
+	if popup.kind == "menu":
+		clock.paused = popup.was_paused
+	if game_over and world.rules.ironman == "on":
+		popup = {}
+		new_game_requested.emit()  # 铁人模式: 家族没了只能重新开一局
+		return
 	popup = {}
 	name_edit = null
 	for s in _popup_spots + _popup_faces:
@@ -295,7 +324,88 @@ func _pick_name(n: String) -> void:
 
 func redraw() -> void:
 	_sync_faces()
+	_update_alerts()
 	_root.queue_redraw()
+
+
+# ---- 提醒 (照三代的「重要事项」: 屏幕上方一排小图标, 点一下就去处理) ----
+
+## 现在该提醒玩家的事
+func alerts_now() -> Array:
+	var m := me()
+	var out := []
+	if m == null or not m.alive:
+		return out
+	var day := clock.day
+	var family: Array = world.house_members(m.house).duplicate() if m.house != "" else []
+	if not family.has(m):
+		family.append(m)
+	var mine := family.filter(func(p: Person) -> bool: return p.alive and world.is_player_court(p))
+	# 孩子没有老师 (三代原版有这个提醒)
+	var kids := mine.filter(func(p: Person) -> bool: return p.age(day) >= 6 and not p.adult(day) and p.guardian == "")
+	if not kids.is_empty():
+		out.append({"kind": "teacher", "icon": "book", "color": Look.GOLD, "count": kids.size(),
+				"tip": "孩子没有老师: %s\n6 岁起要请老师, 不然只能自己学, 教育会差。\n(点一下: 给%s请老师)" % [_names(kids), kids[0].name],
+				"click": func() -> void:
+					show_person(kids[0].id)
+					_open_teacher()})
+	# 家里有成年人没结婚
+	var single := mine.filter(func(p: Person) -> bool:
+		return p.adult(day) and not p.married() and p.betrothed == "" and p.prisoner_of == "" and p.age(day) <= (40 if p.female else 60))
+	if not single.is_empty():
+		out.append({"kind": "marry", "icon": "rings", "color": Look.GOLD, "count": single.size(),
+				"tip": "家里有成年人没结婚: %s\n只有你能给他们说亲。\n(点一下: 给%s说亲)" % [_names(single), single[0].name],
+				"click": func() -> void:
+					show_person(single[0].id)
+					_open_match()})
+	# 直辖领地超过上限
+	var inc := world.income(m)
+	if inc.domain > inc.limit:
+		out.append({"kind": "domain", "icon": "tower", "color": Look.RED, "count": inc.domain - inc.limit,
+				"tip": "直辖领地 %d 块, 超过上限 %d 块: 多出来的 %d 块不出钱、不出兵。\n(点一下: 打开你的国家, 把领地封出去)" % [inc.domain, inc.limit, inc.domain - inc.limit],
+				"click": _open_realm_window})
+	# 有人关在你的大牢里
+	var held := world.living.values().filter(func(p: Person) -> bool: return p.alive and p.prisoner_of == m.id)
+	if not held.is_empty():
+		out.append({"kind": "prison", "icon": "helmet", "color": Look.TEXT, "count": held.size(),
+				"tip": "关在你大牢里的人: %s\n可以放了、要赎金、处死……\n(点一下: 看%s)" % [_names(held), held[0].name],
+				"click": func() -> void:
+					show_person(held[0].id)
+					_open_actions()})
+	return out
+
+
+func _names(list: Array) -> String:
+	var shown := list.slice(0, 6).map(func(p: Person) -> String: return p.name)
+	return "、".join(shown) + (" 等 %d 人" % list.size() if list.size() > 6 else "")
+
+
+func _alert_rect(i: int, n: int) -> Rect2:
+	var c := Vector2(960.0 + (i - (n - 1) / 2.0) * ALERT_GAP, ALERT_Y)
+	return Rect2(c - Vector2(ALERT_R, ALERT_R), Vector2(ALERT_R, ALERT_R) * 2)
+
+
+func _update_alerts() -> void:
+	alerts = alerts_now()
+	var key := ",".join(alerts.map(func(a: Dictionary) -> String: return "%s%d" % [a.kind, a.count]))
+	if key != _alert_key:
+		_alert_key = key
+		for s in _alert_spots:
+			if _hover_spot == s:
+				_hover_spot = null
+			s.queue_free()
+		_alert_spots.clear()
+		for i in alerts.size():
+			_spot(_alert_rect(i, alerts.size()), "", _alert_click.bind(alerts[i].kind), _alert_spots)
+	for i in mini(alerts.size(), _alert_spots.size()):
+		_alert_spots[i].tooltip_text = alerts[i].tip
+
+
+func _alert_click(kind: String) -> void:
+	for a in alerts:
+		if a.kind == kind:
+			a.click.call()
+			return
 
 
 ## 某个人现在的头像 (同一个人同一个岁数只画一次)
@@ -309,6 +419,8 @@ func face(p: Person) -> Texture2D:
 ## 头像跟着玩家、开着的窗口换 (左边窗口开着时盖住左下角的头像, 跟三代一样)
 func _sync_faces() -> void:
 	sync_player()
+	if _rules_spot:
+		_rules_spot.visible = player_id == ""
 	_player_face.visible = player_id != "" and county == 0 and person_id == ""
 	if _player_face.visible:
 		_player_face.texture = face(me())
@@ -362,6 +474,7 @@ func show_county(index: int) -> void:
 	_drop_person()
 	close_window()
 	county = index
+	map.set_focus_person(world.county_at(index).lord)
 	show_help = false
 	for s in _county_spots:
 		s.visible = true
@@ -370,6 +483,8 @@ func show_county(index: int) -> void:
 
 func close_county() -> void:
 	county = 0
+	if person_id == "":
+		map.set_focus_person("")
 	for s in _county_spots:
 		s.visible = false
 	redraw()
@@ -383,6 +498,7 @@ func show_person(id: String) -> void:
 	_drop_person()
 	close_window()  # 说亲、教育的窗口是跟着人的, 换人就关上
 	person_id = id
+	map.set_focus_person(id if world.is_landed(world.people[id]) else "")
 	show_help = false
 	_make_person_spots()
 	redraw()
@@ -391,6 +507,8 @@ func show_person(id: String) -> void:
 func close_person() -> void:
 	_drop_person()
 	close_window()
+	if county == 0:
+		map.set_focus_person("")
 	redraw()
 
 
@@ -470,6 +588,7 @@ func _make_spots() -> void:
 			_spot(Rect2(1878, RIGHT_MENU_Y[i] - 20, 42, 40), m[2], later.bind(m[2], m[3]))
 	# 左下角
 	_spot(PORTRAIT, "你玩的这个人 (点一下看人物窗口)", _open_player)
+	_rules_spot = _spot(RULES_BUTTON, "开局设置: 生成家人、铁人模式、孩子夭折多少…… (开始以后不能改)", open_rules)
 	var squares := [["生活重点", 12], ["信仰", 13], ["文化", 14]]
 	for i in 3:
 		_spot(Rect2(0, LEFT_SQUARES_Y[i] - 20, 45, 40), "你的" + squares[i][0], later.bind(squares[i][0], squares[i][1]))
@@ -484,7 +603,7 @@ func _make_spots() -> void:
 			_spot(Rect2(c - Vector2(r, r), Vector2(r, r) * 2), bottom[i][0], later.bind(bottom[i][0], bottom[i][1]))
 	# 右下角: 日期和速度
 	_spot(DATE_BAR, "", Callable())
-	_spot(Rect2(1330, 1042, 34, 36), "菜单 (存档、设置、退出)", _menu)
+	_spot(Rect2(1330, 1042, 34, 36), "菜单: 存档、读档、退出", _menu)
 	_spot(Rect2(1368, 1042, 34, 36), "操作说明 (F1)", _toggle_help)
 	_spot(Rect2(1410, 1040, 330, 40), "空格: 暂停 / 继续", _toggle_pause)
 	for i in 5:
@@ -497,9 +616,10 @@ func _make_spots() -> void:
 	var small := [["公国 (按法理, 就是名义上本来该归谁)", MapView.Mode.DUCHY], ["王国 (按法理)", MapView.Mode.KINGDOM], ["帝国 (按法理)", MapView.Mode.EMPIRE]]
 	for i in 3:
 		_spot(Rect2(MODE_SMALL[i] - Vector2(14, 14), Vector2(28, 28)), "地图模式: " + small[i][0], mode_requested.emit.bind(small[i][1]))
-	var later_modes := [["地形", 15], ["文化", 14], ["宗教", 13], ["更多地图模式", 15]]
-	for i in 4:
+	var later_modes := [["地形", 15], ["文化", 14], ["宗教", 13]]
+	for i in 3:
 		_spot(Rect2(MODE_SMALL[i + 3] - Vector2(13, 13), Vector2(26, 26)), "地图模式: " + later_modes[i][0], later.bind("地图模式: " + later_modes[i][0], later_modes[i][1]))
+	_spot(Rect2(MODE_SMALL[6] - Vector2(13, 13), Vector2(26, 26)), "地图模式: 家族 (每块地按主人的家族上色, 一眼看出哪家管哪里)", mode_requested.emit.bind(MapView.Mode.HOUSE))
 	# 左边的领地窗口 (开着的时候才有)
 	_spot(SIDE_PANEL, "", Callable(), _county_spots)
 	_spot(PANEL_FACE, "点一下看这个人", _open_holder, _county_spots)
@@ -1228,8 +1348,156 @@ func _play_this() -> void:
 		play_requested.emit(world.county_at(county).lord)
 
 
+# ---- 菜单: 存档、读档、退出 (照三代: 随时能存、能读; 打开菜单时游戏暂停) ----
+
 func _menu() -> void:
-	toast("存档、设置以后才有。现在要退出就直接关窗口")
+	if not popup.is_empty():
+		return
+	var was := clock.paused
+	clock.paused = true
+	show_popup({"kind": "menu", "view": "main", "was_paused": was, "armed": -1})
+
+
+## 菜单里换一页 (main 主菜单 / save 存档 / load 读档)
+func _menu_view(view: String) -> void:
+	var keep := popup.duplicate()
+	keep.view = view
+	keep.armed = -1
+	for s in _popup_spots + _popup_faces:
+		if _hover_spot == s:
+			_hover_spot = null
+		s.queue_free()
+	_popup_spots.clear()
+	_popup_faces.clear()
+	name_edit = null
+	popup = keep
+	_spot(Rect2(0, 0, 1920, 1080), "", Callable(), _popup_spots)
+	_make_menu(popup)
+	redraw()
+
+
+func _menu_button(i: int) -> Rect2:
+	return Rect2(MENU_BOX.position.x + 150, MENU_BOX.position.y + 130 + i * 76, 400, 58)
+
+
+func _menu_row(i: int) -> Rect2:
+	return Rect2(MENU_BOX.position.x + 30, MENU_BOX.position.y + (220 if popup.view == "save" else 110) + i * 62, MENU_BOX.size.x - 60, 56)
+
+
+func _menu_back() -> Rect2:
+	return Rect2(MENU_BOX.position.x + 30, MENU_BOX.end.y - 76, 200, 52)
+
+
+func _make_menu(data: Dictionary) -> void:
+	match data.view:
+		"main":
+			var iron: bool = world.rules.ironman == "on"
+			var items := [["继续游戏", close_popup],
+					["存档", (func() -> void: toast("铁人模式不能自己存档 (每半年和退出时自动存)")) if iron else _menu_view.bind("save")],
+					["读档", (func() -> void: toast("铁人模式不能读档")) if iron else _menu_view.bind("load")],
+					["退出游戏", _menu_quit],
+					["开局设置", func() -> void:
+						close_popup()
+						open_rules()]]
+			for i in items.size():
+				_spot(_menu_button(i), "", items[i][1], _popup_spots)
+		"save":
+			popup.saves = SaveGame.list().filter(func(x: Dictionary) -> bool: return not x.auto).slice(0, MENU_ROWS)
+			var me := me()
+			var edit := LineEdit.new()
+			edit.position = MENU_BOX.position + Vector2(30, 110)
+			edit.size = Vector2(450, 52)
+			edit.max_length = 40
+			edit.text = ("%s · %s" % [me.name, GameDate.text(clock.day)]) if me != null else GameDate.text(clock.day)
+			edit.add_theme_font_override("font", Look.font("sans"))
+			edit.add_theme_font_size_override("font_size", 20)
+			edit.add_theme_color_override("font_color", Look.TEXT)
+			for state in ["normal", "focus"]:
+				var box := StyleBoxFlat.new()
+				box.bg_color = Color(0.1, 0.105, 0.12)
+				box.border_color = Look.GOLD if state == "focus" else Look.GOLD_DIM
+				box.set_border_width_all(2)
+				box.set_content_margin_all(10)
+				edit.add_theme_stylebox_override(state, box)
+			edit.text_submitted.connect(func(t: String) -> void: _save_new(t))
+			_root.add_child(edit)
+			_popup_faces.append(edit)
+			name_edit = edit
+			_spot(Rect2(MENU_BOX.position + Vector2(495, 110), Vector2(175, 52)), "用这个名字存一个新的档", func() -> void: _save_new(edit.text), _popup_spots)
+			for i in popup.saves.size():
+				_spot(_menu_row(i), "点两次: 盖掉这个旧存档", _menu_pick.bind(i), _popup_spots)
+			_spot(_menu_back(), "", _menu_view.bind("main"), _popup_spots)
+		"load":
+			popup.saves = SaveGame.list().slice(0, MENU_ROWS + 2)
+			for i in popup.saves.size():
+				_spot(_menu_row(i), "点两次: 读这个存档 (现在没存的进度会没了)", _menu_pick.bind(i), _popup_spots)
+			_spot(_menu_back(), "", _menu_view.bind("main"), _popup_spots)
+
+
+## 退出要点两次 (没存的进度会没了)
+func _menu_quit() -> void:
+	if popup.armed != 99:
+		popup.armed = 99
+		toast("再点一次「退出游戏」就退出 (没存的进度会没了)")
+		redraw()
+		return
+	quit_requested.emit()
+
+
+# ---- 开局设置 (照三代的游戏规则: 开局前选, 开始以后只能看) ----
+
+func open_rules() -> void:
+	if not popup.is_empty():
+		return
+	show_popup({"kind": "rules", "view": "rules", "armed": -1})
+
+
+func _make_rules() -> void:
+	for i in Rules.LIST.size():
+		var r: Array = Rules.LIST[i]
+		for j in r[3].size():
+			_spot(_rule_option(i, j), r[2], _pick_rule.bind(r[0], r[3][j][0]), _popup_spots)
+	_spot(_menu_back(), "", close_popup, _popup_spots)
+
+
+func _rule_option(i: int, j: int) -> Rect2:
+	return Rect2(MENU_BOX.position.x + 30 + j * 215, MENU_BOX.position.y + 168 + i * 150, 205, 44)
+
+
+func _pick_rule(id: String, value: String) -> void:
+	if player_id != "":
+		toast("游戏开始以后不能改开局设置")
+		return
+	if world.rules[id] == value:
+		return
+	var r: Dictionary = world.rules.duplicate()
+	r[id] = value
+	close_popup()
+	rules_changed.emit(r)
+
+
+func _save_new(label: String) -> void:
+	var t := label.strip_edges()
+	if t == "":
+		t = GameDate.text(clock.day)
+	close_popup()
+	save_requested.emit(t, "")
+
+
+## 存档名单里点了一个: 点两次才算 (盖掉旧档、读档都不能反悔)
+func _menu_pick(i: int) -> void:
+	if popup.armed != i:
+		popup.armed = i
+		toast("再点一次确定")
+		redraw()
+		return
+	var s: Dictionary = popup.saves[i]
+	if popup.view == "save":
+		close_popup()
+		save_requested.emit(s.label, s.path.get_file().get_basename())
+	else:
+		close_popup()
+		load_requested.emit(s.path)
 
 
 func _toggle_help() -> void:
@@ -1313,6 +1581,7 @@ class Root:
 		_date_bar()
 		if hud.player_id == "":
 			_banner()
+		_alert_row()
 		if hud.person_id != "":
 			_person_panel()
 		if hud.county:
@@ -1362,6 +1631,17 @@ class Root:
 						value = "%d/%d" % [inc.domain, inc.limit]
 				Look.text(self, Vector2(x + 40, 24), value, 20, Look.RED if i == 5 and inc.domain > inc.limit else Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
 				Look.text(self, Vector2(x + 40, 40), gain, 13, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+
+	# ---- 屏幕上方正中: 提醒 ----
+	func _alert_row() -> void:
+		var n := hud.alerts.size()
+		for i in n:
+			var a: Dictionary = hud.alerts[i]
+			var r := hud._alert_rect(i, n)
+			var c := r.get_center()
+			Look.round_button(self, c, ALERT_R, a.icon, a.color, a.kind == "domain", hot(r))
+			draw_circle(c + Vector2(ALERT_R * 0.75, -ALERT_R * 0.7), 10, Color("b0352b"))
+			Look.text_center(self, Rect2(c + Vector2(ALERT_R * 0.75 - 10, -ALERT_R * 0.7 - 10), Vector2(20, 20)), str(a.count), 13, Color.WHITE, "sans")
 
 	# ---- 右边一列 ----
 	func _right_menu() -> void:
@@ -1454,13 +1734,14 @@ class Root:
 		Look.text(self, Vector2(r.position.x + 14, r.position.y + 50), "现在: " + MapView.MODE_NAMES[hud.map.mode], 17, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
 		var mode := hud.map.mode
 		Look.round_button(self, MODE_BIG, 22, "banner", Color("c84a3a"), mode == MapView.Mode.REALM, hot(Rect2(MODE_BIG - Vector2(22, 22), Vector2(44, 44))))
-		var labels := ["coronet", "crown", "imperial_crown", "mountain", "book", "cross", "plus"]
-		var modes := [MapView.Mode.DUCHY, MapView.Mode.KINGDOM, MapView.Mode.EMPIRE]
+		var labels := ["coronet", "crown", "imperial_crown", "mountain", "book", "cross", "house"]
+		var modes := [MapView.Mode.DUCHY, MapView.Mode.KINGDOM, MapView.Mode.EMPIRE, -1, -1, -1, MapView.Mode.HOUSE]
 		for i in labels.size():
 			var c: Vector2 = MODE_SMALL[i]
 			var rad := 14.0 if i < 3 else 13.0
-			var lit: bool = i < 3 and mode == modes[i]
-			Look.round_button(self, c, rad, labels[i], Icons.GOLD if i < 3 else Look.TEXT_DIM, lit, hot(Rect2(c - Vector2(rad, rad), Vector2(rad, rad) * 2)))
+			var lit: bool = mode == modes[i]
+			var usable: bool = modes[i] != -1
+			Look.round_button(self, c, rad, labels[i], Icons.GOLD if usable else Look.TEXT_DIM, lit, hot(Rect2(c - Vector2(rad, rad), Vector2(rad, rad) * 2)))
 
 	# ---- 右下角: 日期和速度 ----
 	func _date_bar() -> void:
@@ -1491,6 +1772,7 @@ class Root:
 		Look.panel(self, BANNER)
 		Look.text_center(self, Rect2(BANNER.position.x, BANNER.position.y + 8, BANNER.size.x, 40), "867 年 1 月 1 日 · 不列颠群岛", 30, Look.GOLD)
 		Look.text_center(self, Rect2(BANNER.position.x, BANNER.position.y + 50, BANNER.size.x, 34), "在地图上点一块领地, 选它的主人来玩 (国王或者封臣)", 22, Look.TEXT, "sans")
+		_wide_button(RULES_BUTTON, "开局设置", false)
 
 	# ---- 左边的领地窗口 ----
 	# ---- 左边的人物窗口 ----
@@ -1872,7 +2154,7 @@ class Root:
 
 	# ---- 操作说明 ----
 	func _help() -> void:
-		var r := Rect2(560, 150, 800, 660)
+		var r := Rect2(560, 110, 800, 760)
 		Look.panel(self, r)
 		Look.text_center(self, Rect2(r.position.x, r.position.y + 14, r.size.x, 44), "操作说明", 30, Look.GOLD)
 		var lines := [
@@ -1880,12 +2162,14 @@ class Root:
 			"鼠标拖地图 (左键、右键、中键都行) 或者 W A S D / 方向键: 移动地图",
 			"鼠标滚轮 (或者触控板两指捏): 放大缩小; 放大了能看到每块领地的名字",
 			"空格: 暂停 / 继续      + -: 快一档 / 慢一档      1～5: 直接换速度",
-			"右下角圆按钮: 换地图模式 (国家、公国、王国、帝国)",
+			"右下角圆按钮: 换地图模式 (国家、公国、王国、帝国、家族)",
 			"左下角盾牌: 看你的国家      Esc: 关窗口      F1: 这个说明",
 			"",
 			"点左下角的头像: 看你玩的这个人 (人物窗口)",
 			"人物窗口下面的按钮: 说亲、教育 (请老师)、互动 (送礼、收回领地、关大牢)",
 			"右边一列第一个「领地」: 你的直辖领地、封臣, 把领地封出去",
+			"右下角「≡」: 存档、读档、退出; 开局前横幅下面的「开局设置」",
+			"上方正中的小图标是提醒 (孩子没老师、有人该结婚了……), 点了直接去办",
 			"做好了第 1–5 块: 地图和时间、人物、家族和继承、结婚生子、封臣;",
 			"打仗、阴谋这些还没有, 点那些按钮会提示「以后才有」。",
 		]
@@ -1933,6 +2217,12 @@ class Root:
 		if hud.popup.kind == "birth":
 			_birth_popup()
 			return
+		if hud.popup.kind == "menu":
+			_menu_popup()
+			return
+		if hud.popup.kind == "rules":
+			_rules_popup()
+			return
 		var w := hud.world
 		var e: Dictionary = hud.popup.event
 		var dead: Person = w.people[e.dead]
@@ -1958,7 +2248,7 @@ class Root:
 			lines.append("%s去世了, 享年 %d 岁。" % [dead.name, dead.age(e.day)])
 			lines.append("%s里没有能继承的男人了," % w.house_name(dead.house))
 			lines.append("他的领地归了%s %s。" % [w.title_of(heir), heir.name])
-			lines.append("游戏结束。你可以换一个人接着玩。")
+			lines.append("游戏结束。你可以换一个人接着玩。" if w.rules.ironman != "on" else "游戏结束 (铁人模式)。")
 		elif kind == "vassal_succession":
 			var rel2 := w.relation(dead, heir)
 			lines.append("享年 %d 岁。" % dead.age(e.day))
@@ -1968,7 +2258,7 @@ class Root:
 			lines.append("%s去世了, 享年 %d 岁。" % [dead.name, dead.age(e.day)])
 			lines.append("%s里没有能继承的男人了。" % w.house_name(dead.house))
 			lines.append("%s的贵族推举了%s当新国王。" % [e.realm_name, heir.name])
-			lines.append("游戏结束。你可以换一个人接着玩。")
+			lines.append("游戏结束。你可以换一个人接着玩。" if w.rules.ironman != "on" else "游戏结束 (铁人模式)。")
 		else:
 			var rel := w.relation(dead, heir)
 			lines.append("享年 %d 岁。" % dead.age(e.day))
@@ -1981,7 +2271,62 @@ class Root:
 			lines.append("你现在是%s (%d 岁)。" % [heir.name, heir.age(e.day)])
 		for i in lines.size():
 			Look.text_center(self, Rect2(r.position.x + 180, r.position.y + 130 + i * 40, r.size.x - 360, 34), lines[i], 19, Look.TEXT, "sans")
-		_wide_button(POPUP_BUTTON, "换一个人接着玩" if over else "继续", true)
+		var iron_over: bool = over and w.rules.ironman == "on"
+		_wide_button(POPUP_BUTTON, "开一局新游戏" if iron_over else ("换一个人接着玩" if over else "继续"), true)
+
+	# ---- 正中间的窗口: 开局设置 ----
+	func _rules_popup() -> void:
+		var r := MENU_BOX
+		var w := hud.world
+		var editable := hud.player_id == ""
+		Look.panel(self, r, Color(0.07, 0.075, 0.09, 1.0))
+		Look.text_center(self, Rect2(r.position.x, r.position.y + 20, r.size.x, 56), "开局设置", 34, Look.GOLD)
+		Look.text_center(self, Rect2(r.position.x, r.position.y + 70, r.size.x, 30),
+				"选好了再选人开始; 开始以后不能改" if editable else "游戏开始以后不能改, 只能看", 16, Look.TEXT_DIM, "sans")
+		for i in Rules.LIST.size():
+			var rule: Array = Rules.LIST[i]
+			var y: float = r.position.y + 120 + i * 150
+			Look.text(self, Vector2(r.position.x + 30, y + 22), rule[1], 22, Look.GOLD)
+			Look.text(self, Vector2(r.position.x + 30, y + 44), rule[2], 14, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 60, "sans")
+			for j in rule[3].size():
+				var br := hud._rule_option(i, j)
+				var on: bool = w.rules[rule[0]] == rule[3][j][0]
+				draw_rect(br, Color(0.2, 0.17, 0.11) if on else Color(0.11, 0.115, 0.13))
+				draw_rect(br, Look.GOLD if on or (hot(br) and editable) else Look.GOLD_DIM, false, 2.0)
+				Look.text_center(self, br, rule[3][j][1], 17, Look.TEXT if on else Look.TEXT_DIM, "sans")
+		_wide_button(hud._menu_back(), "开始选人" if editable else "返回", true)
+
+	# ---- 正中间的窗口: 菜单 (存档、读档、退出) ----
+	func _menu_popup() -> void:
+		var r := MENU_BOX
+		var pop := hud.popup
+		Look.panel(self, r, Color(0.07, 0.075, 0.09, 1.0))
+		var title: String = {"main": "菜单", "save": "存档", "load": "读档"}[pop.view]
+		Look.text_center(self, Rect2(r.position.x, r.position.y + 20, r.size.x, 56), title, 34, Look.GOLD)
+		match pop.view:
+			"main":
+				var names := ["继续游戏", "存档", "读档", "再点一次就退出" if pop.armed == 99 else "退出游戏", "开局设置"]
+				for i in names.size():
+					_wide_button(hud._menu_button(i), names[i], i == 0)
+				var iron: bool = hud.world.rules.ironman == "on"
+				Look.text_center(self, Rect2(r.position.x, hud._menu_button(5).position.y + 10, r.size.x, 30),
+						"铁人模式: 每半年和退出时自动存档, 不能自己存、读" if iron else "每年 1 月 1 日自动存一次档 (读档里叫「自动存档」)", 16, Look.TEXT_DIM, "sans")
+			"save", "load":
+				if pop.view == "save":
+					_wide_button(Rect2(r.position + Vector2(495, 110), Vector2(175, 52)), "存新的档", true)
+					Look.text(self, r.position + Vector2(30, 205), "或者盖掉一个旧存档 (点两次):", 17, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1, "sans")
+				var saves: Array = pop.get("saves", [])
+				if saves.is_empty():
+					Look.text_center(self, Rect2(r.position.x, hud._menu_row(0).position.y + 10, r.size.x, 40), "还没有存档", 20, Look.TEXT_DIM, "sans")
+				for i in saves.size():
+					var s: Dictionary = saves[i]
+					var rr := hud._menu_row(i)
+					var armed: bool = pop.armed == i
+					draw_rect(rr, Color(0.3, 0.1, 0.08) if armed else (Color(0.13, 0.12, 0.1) if hot(rr) else Color(0.09, 0.095, 0.11)))
+					draw_rect(rr, Look.RED if armed else (Look.GOLD if hot(rr) else Color(Look.GOLD_DIM, 0.4)), false, 1.5)
+					Look.text(self, rr.position + Vector2(16, 24), s.label + ("  (再点一次确定)" if armed else ""), 19, Look.RED if armed else Look.TEXT, HORIZONTAL_ALIGNMENT_LEFT, rr.size.x - 32, "sans")
+					Look.text(self, rr.position + Vector2(16, 47), "%s · 游戏里 %s · 存于 %s" % [s.who, GameDate.text(s.day), s.saved_at.replace("T", " ").left(16)], 14, Look.TEXT_DIM, HORIZONTAL_ALIGNMENT_LEFT, rr.size.x - 32, "sans")
+				_wide_button(hud._menu_back(), "返回", false)
 
 	# ---- 正中间的窗口: 你的孩子出生了, 给孩子起名 ----
 	func _birth_popup() -> void:

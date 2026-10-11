@@ -12,6 +12,7 @@ func _initialize() -> void:
 	out = args[0] if args.size() > 0 else OS.get_user_data_dir()
 	DirAccess.make_dir_recursive_absolute(out)
 	DisplayServer.window_set_size(Vector2i(1920, 1080))
+	SaveGame.dir = OS.get_temp_dir().path_join("bloodline_shot_saves")  # 不碰真的存档
 	main = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
 	_run.call_deferred()
@@ -33,6 +34,9 @@ func _run() -> void:
 	var map: MapView = main.map
 	var hud: Hud = main.hud
 	await _shot("1_开局")
+	hud.open_rules()
+	await _shot("1b_开局设置")
+	hud.close_popup()
 
 	main._on_county_clicked(w.by_id.hampshire.index)
 	await _shot("2_点了汉普郡")
@@ -157,6 +161,39 @@ func _run() -> void:
 	map.focus(w.by_id.berkshire.seat, 1.6)
 	main._on_county_clicked(w.by_id.berkshire.index)
 	await _shot("26_领地窗口_伯克郡")
+
+	# 地图上分出国王和封臣 (学三代): 封臣之间的细线、纹章, 选中国王时他的地亮起来, 家族地图模式
+	main.close_panel()
+	map.focus(w.by_id.oxford.seat, 0.75)
+	await _shot("27_地图_封臣和纹章")
+	main._on_county_clicked(w.by_id[w.realms.wessex.capital].index)
+	await _shot("28_地图_选中国王")
+	main.close_panel()
+	map.set_mode(MapView.Mode.HOUSE)
+	hud.redraw()
+	await _shot("29_地图_家族模式")
+	map.set_mode(MapView.Mode.REALM)
+	map.focus(w.by_id.scone.seat, 1.2)
+	await _shot("30_地图_阿尔巴放大")
+
+	# 存档 (照三代: 菜单里随时能存、能读)
+	main.save_game("截图用的存档")
+	hud._menu()
+	await _shot("31_菜单")
+	hud._menu_view("save")
+	await _shot("32_存档")
+	hud._menu_view("load")
+	await _shot("33_读档")
+	hud.close_popup()
+	# 提醒 (照三代的「重要事项」): 屏幕上方正中一排
+	var kid2: Person = w.people["aethelhelm"]
+	kid2.birth_day = main.clock.day - 7 * 365
+	kid2.guardian = ""
+	map.show_all()
+	hud.redraw()
+	await _shot("34_提醒")
+	for file in DirAccess.get_files_at(SaveGame.dir):
+		DirAccess.remove_absolute(SaveGame.dir.path_join(file))
 	quit()
 
 

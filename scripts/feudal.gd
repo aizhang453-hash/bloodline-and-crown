@@ -10,7 +10,12 @@ const LEVY_PER_COUNTY := 200      # 每块领地能征的兵
 const CONTRACTS := ["少交", "照常", "多交"]
 const TAX_SHARE := [0.10, 0.20, 0.30]
 const LEVY_SHARE := [0.15, 0.25, 0.35]
-const BASE_DOMAIN := 2            # 亲自管的领地上限: 2 块 + 管理每 5 点多 1 块
+# 亲自管的领地上限 (照三代现在的算法, 用户 2026-10-10 选的): 基础 + 头衔等级 + 教育。
+# 基础值官方百科没写数字, 用论坛上常见的 1; 我们 867 年的国王地盘相当于三代的公爵, 副王是公爵, 封臣是伯爵, 都是 +2;
+# 教育三代五档 (第 1 档 -1、第 3 档 +1、第 4 档 +2、第 5 档 +3), 我们四档对应成 差 -1、一般 0、好 +1、出色 +2
+const BASE_DOMAIN := 1
+const RANK_DOMAIN := 2
+const EDU_DOMAIN := [-1, 0, 1, 2]
 const TYRANNY := 20.0             # 没理由收回、没理由关人、让封臣多交
 const TYRANNY_EXECUTE := 10.0     # 处死
 const TYRANNY_DECAY := 0.25       # 每月降多少 (三代也是 0.25)
@@ -46,8 +51,11 @@ static func kind_desc(k: String) -> String:
 
 
 ## 亲自管的领地上限
-static func domain_limit(p: Person, day: int) -> int:
-	return BASE_DOMAIN + p.skill("stewardship", day) / 5
+static func domain_limit(p: Person, _day: int) -> int:
+	var edu := 0
+	if not p.education.is_empty() and int(p.education.level) > 0:
+		edu = EDU_DOMAIN[int(p.education.level) - 1]
+	return BASE_DOMAIN + RANK_DOMAIN + edu
 
 
 ## 收回这个人的领地算不算暴政、算多少 (有理由的不算)

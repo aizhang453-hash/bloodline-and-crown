@@ -16,9 +16,8 @@ const CULTURE_NAMES := {
 }
 const HEALTH_BANDS := [[1.0, "很差"], [2.5, "差"], [4.0, "一般"], [5.5, "好"], [INF, "很好"]]
 const SPOUSE_SHARE := 5       # 国王的配偶: 本事的五分之一加给国王
-# 小孩身子弱 (第 4 块: 用户定的大约五个孩子里一个长不到 16 岁; 史实大约三分之一)
-const BABY_HEALTH := -1.5     # 不满 1 岁
-const CHILD_HEALTH := -0.8    # 1 到 4 岁
+# 小孩身子弱 (第 4 块: 用户定的大约五个孩子里一个长不到 16 岁; 史实大约三分之一)。开局设置「孩子夭折」能换 (Rules.CHILD_HEALTH)
+static var child_health := [-1.5, -0.8, 0.0, 0.0]  # 不满 1 岁, 1 到 4 岁, 5 到 9 岁, 10 到 15 岁
 const DUNGEON_HEALTH := -1.5  # 关在地牢里 (照三代: 地牢伤身体)
 
 var id: String
@@ -132,6 +131,42 @@ func add_stress(amount: float) -> void:
 	stress = clampf(stress + amount, 0.0, MAX_STRESS)
 
 
+# ---- 存档 ----
+
+## 存档要存的东西 (spouse_ref 读档以后 World 重新接上)
+const SAVE_FIELDS := ["id", "name", "female", "birth_day", "birth_estimated", "culture", "dna", "rank", "realm", "note",
+	"traits", "education", "base_skills", "stress", "father", "mother", "spouse", "former_spouses", "secondary", "homeland",
+	"betrothed", "pregnant", "last_birth", "focus", "guardian", "edu_points", "edu_years", "taught", "house", "alive",
+	"death_day", "prestige", "liege_realm", "contract", "gold", "tyranny", "prisoner_of", "dungeon", "crimes", "memories"]
+
+
+func to_save() -> Dictionary:
+	var d := {}
+	for f in SAVE_FIELDS:
+		d[f] = get(f)
+	return d
+
+
+## 读档: JSON 里的数字都是小数, 照原来的类型转回去
+static func from_save(d: Dictionary) -> Person:
+	var p := Person.new()
+	for f in SAVE_FIELDS:
+		if not d.has(f):
+			continue
+		var v: Variant = d[f]
+		match typeof(p.get(f)):
+			TYPE_INT:
+				v = int(v)
+			TYPE_FLOAT:
+				v = float(v)
+			TYPE_BOOL:
+				v = bool(v)
+			TYPE_STRING:
+				v = str(v)
+		p.set(f, v)
+	return p
+
+
 ## 过了几天: 压力慢慢降
 func pass_days(days: int) -> void:
 	var decay := STRESS_DECAY * (2.0 if has_trait("calm") else 1.0)
@@ -188,9 +223,11 @@ func health_parts(day: int, labels := true) -> Array:
 	var parts := [["普通人", 5.0]]
 	var a := age(day)
 	if a < 1:
-		parts.append(["婴儿", BABY_HEALTH])
-	elif a < 5:
-		parts.append([("小孩 (%d 岁)" % a) if labels else "", CHILD_HEALTH])
+		parts.append(["婴儿", float(child_health[0])])
+	elif a < ADULT:
+		var band := 1 if a < 5 else (2 if a < 10 else 3)
+		if float(child_health[band]) != 0.0:
+			parts.append([("小孩 (%d 岁)" % a) if labels else "", float(child_health[band])])
 	if a > 40:
 		parts.append([("年纪 (%d 岁)" % a) if labels else "", -pow(a - 40, 2) / 400.0])
 	for t in traits:

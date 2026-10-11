@@ -460,8 +460,8 @@ func test_ai_marries_royals_but_not_player_family() -> void:
 		w.advance(30, day)
 	for id in ["anarawd", "gwriad", "cadell"]:
 		var p := person(id)
-		if p.alive:
-			eq(p.spouse, "", "%s 是玩家家里的人, 电脑不替他说亲" % p.name)
+		if p.alive and w.is_player_court(p):  # 当了国王、封了领地的就自己做主了 (照三代)
+			eq(p.spouse, "", "%s 是玩家家里没领地的人, 电脑不替他说亲" % p.name)
 	var single := 0
 	var total := 0
 	for rid in w.realm_order:

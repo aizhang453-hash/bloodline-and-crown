@@ -9,7 +9,9 @@ var hud: Hud
 
 
 func before_each() -> void:
+	SaveGame.dir = OS.get_temp_dir().path_join("bloodline_test_saves_%d" % OS.get_process_id())  # 不碰真的存档
 	main = load("res://scenes/main.tscn").instantiate()
+	main.allow_quit = false
 	(Engine.get_main_loop() as SceneTree).root.add_child(main)
 	world = main.world
 	map = main.map
@@ -18,6 +20,8 @@ func before_each() -> void:
 
 func after_each() -> void:
 	main.free()
+	for file in DirAccess.get_files_at(SaveGame.dir) if DirAccess.dir_exists_absolute(SaveGame.dir) else []:
+		DirAccess.remove_absolute(SaveGame.dir.path_join(file))
 
 
 func key(code: Key) -> void:
@@ -39,7 +43,7 @@ func click_map(p: Vector2, button := MOUSE_BUTTON_LEFT) -> void:
 
 ## 点界面上的一个能点的地方 (按位置找; 跟 Godot 一样, 后加的在上面, 先接到点击)
 func click_hud(p: Vector2) -> bool:
-	var all: Array = hud._spots + hud._county_spots + hud._person_spots + hud._window_spots + hud._popup_spots
+	var all: Array = hud._spots + hud._alert_spots + hud._county_spots + hud._person_spots + hud._window_spots + hud._popup_spots
 	all.reverse()
 	for s in all:
 		if not s.visible or not Rect2(s.position, s.size).has_point(p):
@@ -258,10 +262,12 @@ func test_player_ruler_dies() -> void:
 
 func test_game_over_when_house_dies_out() -> void:
 	main.play_as("east_anglia")
+	for c in world.children_of(world.ruler("east_anglia")):  # 开局生成的儿子先死
+		world.kill(c, main.clock.day, [])
 	var events := []
 	world.kill(world.ruler("east_anglia"), main.clock.day, events)
 	main.handle_events(events)
-	eq(hud.popup.get("kind", ""), "game_over", "埃德蒙没有家人, 游戏结束")
+	eq(hud.popup.get("kind", ""), "game_over", "埃德蒙没有儿子了, 游戏结束")
 	check(click_hud(Hud.POPUP_BUTTON.get_center()), "点「换一个国王接着玩」")
 	eq(hud.player, "", "可以重新选国王")
 	main._on_county_clicked(world.by_id.norwich.index)
@@ -549,6 +555,8 @@ func test_vassal_player_succession_and_game_over() -> void:
 	son.traits = Traits.random_personality(world.rng)
 	son.education = {"skill": "martial", "level": 2}
 	son.dna = Portrait.random_dna(world.rng, son.culture)
+	for c in world.children_of(v):  # 开局生成的孩子先死, 只留测试的儿子
+		world.kill(c, main.clock.day, [])
 	world._register(son)
 	var events := []
 	world.kill(v, main.clock.day, events)
@@ -596,6 +604,10 @@ func test_no_random_or_history_labels() -> void:
 	no_meta("互动窗口")
 	hud._open_realm_window()
 	no_meta("国家窗口")
+	hud.close_window()
+	hud.open_rules()
+	no_meta("开局设置")
+	hud.close_popup()
 
 
 func test_cannot_arrange_for_landed_relative() -> void:
@@ -610,3 +622,191 @@ func test_cannot_arrange_for_landed_relative() -> void:
 	hud.show_person(k.id)
 	if not k.married():
 		check(person_button("说亲").x > 0, "你自己的婚事你管")
+
+
+# ---- 地图上分出国王和封臣 (学三代) ----
+
+func test_map_shows_lords() -> void:
+	var lords := {}
+	map.set_mode(MapView.Mode.REALM)
+	for c in world.counties:
+		lords[c.lord] = map._lookup.get_pixel(c.index, 2)
+	var ws := world.counties_of("wessex")
+	var a: Dictionary = ws[0]
+	var b: Dictionary = world.by_id.berkshire
+	check(map._lookup.get_pixel(a.index, 2) != map._lookup.get_pixel(b.index, 2), "国王和伯克郡郡长的地之间画线 (主人不一样)")
+	var shields: Array = map.overlay.shields()
+	var who := shields.map(func(sh: Dictionary) -> String: return sh.person.id)
+	check(who.has(world.realms.wessex.ruler_id) and who.has("aethelwulf_berkshire"), "国王和郡长都有纹章")
+	for sh in shields:
+		if sh.person.id == world.realms.wessex.ruler_id:
+			check(sh.king, "国王的纹章带王冠")
+
+
+func test_map_focus_highlights_domain() -> void:
+	map.set_mode(MapView.Mode.REALM)
+	var cap: Dictionary = world.by_id[world.realms.wessex.capital]
+	var berk: Dictionary = world.by_id.berkshire
+	var york: Dictionary = world.by_id.york
+	var plain_cap := map._lookup.get_pixel(cap.index, 0)
+	var plain_york := map._lookup.get_pixel(york.index, 0)
+	main._on_county_clicked(cap.index)
+	eq(map.focus_person, world.realms.wessex.ruler_id, "点国王的地: 选中国王")
+	check(map._lookup.get_pixel(cap.index, 0).v > plain_cap.v, "国王直辖的地亮起来")
+	check(map._lookup.get_pixel(york.index, 0).v < plain_york.v, "别的国家暗下去")
+	var berk_col := map._lookup.get_pixel(berk.index, 0)
+	check(berk_col.v < map._lookup.get_pixel(cap.index, 0).v, "郡长的地比国王直辖的暗")
+	main.close_panel()
+	eq(map.focus_person, "", "关了窗口就不选了")
+	hud.show_person("aethelwulf_berkshire")
+	eq(map.focus_person, "aethelwulf_berkshire", "看郡长的人物窗口: 选中郡长")
+
+
+func test_house_map_mode() -> void:
+	check(click_hud(Hud.MODE_SMALL[6]), "点「家族」地图模式")
+	eq(map.mode, MapView.Mode.HOUSE)
+	var a: Color = map._lookup.get_pixel(world.by_id[world.realms.wessex.capital].index, 0)
+	var b: Color = map._lookup.get_pixel(world.by_id.berkshire.index, 0)
+	check(not a.is_equal_approx(b), "国王家族和郡长家族颜色不一样")
+	var texts: Array = map.overlay._groups().map(func(g: Dictionary) -> String: return g.text)
+	check(texts.has(world.house_name(world.people["aethelwulf_berkshire"].house)), "地图上写着家族的名字")
+
+
+# ---- 存档 (照三代: 菜单里随时能存、能读) ----
+
+func test_menu_save_and_load() -> void:
+	main.play_as("wessex")
+	main.clock.paused = false
+	check(click_hud(Vector2(1347, 1060)), "点右下角的「≡」菜单")
+	eq(hud.popup.get("kind", ""), "menu")
+	check(main.clock.paused, "打开菜单游戏暂停")
+	check(click_hud(hud._menu_button(1).get_center()), "点「存档」")
+	eq(hud.popup.view, "save")
+	hud.name_edit.text = "我的第一个存档"
+	hud.name_edit.text_submitted.emit(hud.name_edit.text)
+	check(hud.popup.is_empty(), "存好了菜单关上")
+	eq(SaveGame.list().size(), 1)
+	var alfred_before: String = world.people["alfred"].name
+	# 走几个月, 再读回来
+	main.clock.paused = false
+	for i in 20:
+		main._process(1.0)
+	var day_after: int = main.clock.day
+	check(click_hud(Vector2(1347, 1060)))
+	check(click_hud(hud._menu_button(2).get_center()), "点「读档」")
+	eq(hud.popup.view, "load")
+	check(click_hud(hud._menu_row(0).get_center()), "点一次")
+	eq(main.clock.day, day_after, "点一次还不读")
+	check(click_hud(hud._menu_row(0).get_center()), "再点一次读档")
+	world = main.world
+	hud = main.hud
+	map = main.map
+	eq(main.clock.day, world.start_day, "回到存档的那天")
+	eq(hud.player_id, world.realms.wessex.ruler_id, "还是玩威塞克斯国王")
+	eq(world.people["alfred"].name, alfred_before)
+	check(main.clock.paused, "读完是暂停的")
+
+
+func test_autosave_each_year() -> void:
+	main.play_as("wessex")
+	main.clock.paused = false
+	main.clock.set_speed(5)
+	while GameDate.from_day(main.clock.day)[0] == 867:
+		main._process(1.0)
+	check(SaveGame.list().any(func(x: Dictionary) -> bool: return x.auto), "到 868 年自动存了一次档")
+
+
+# ---- 提醒 (照三代的「重要事项」) ----
+
+func alert(kind: String) -> Dictionary:
+	hud.redraw()
+	for a in hud.alerts:
+		if a.kind == kind:
+			return a
+	return {}
+
+
+func test_alerts() -> void:
+	eq(hud.alerts.size(), 0, "没选人时没有提醒")
+	main.play_as("wessex")
+	var k := world.ruler("wessex")
+	check(not alert("marry").is_empty(), "阿尔弗雷德成年没结婚: 有提醒")
+	has_text(alert("marry").tip, "阿尔弗雷德")
+	# 孩子没有老师
+	var kid: Person = world.people["aethelhelm"]
+	kid.birth_day = main.clock.day - 7 * 365
+	kid.guardian = ""
+	check(not alert("teacher").is_empty(), "7 岁的孩子没有老师: 有提醒")
+	var idx := -1
+	for i in hud.alerts.size():
+		if hud.alerts[i].kind == "teacher":
+			idx = i
+	var r := hud._alert_rect(idx, hud.alerts.size())
+	check(click_hud(r.get_center()), "点提醒")
+	eq(hud.person_id, "aethelhelm")
+	eq(hud.window.get("kind", ""), "teacher", "直接打开请老师的窗口")
+	# 直辖超过上限
+	for c in world.counties_of("wessex"):
+		c.lord = k.id
+	world._feudal_dirty = true
+	check(not alert("domain").is_empty(), "直辖超过上限: 有提醒")
+	# 大牢
+	world.people["wulfhere_wiltshire"].prisoner_of = k.id
+	check(not alert("prison").is_empty(), "有人关在大牢里: 有提醒")
+	world.people["wulfhere_wiltshire"].prisoner_of = ""
+	check(alert("prison").is_empty(), "放了就没了")
+
+
+func test_player_kids_get_no_automatic_teacher() -> void:
+	# 照三代 (也是第 4 块清单写的): 你家孩子的老师你请, 电脑家的自动请
+	main.play_as("wessex")
+	var kid: Person = world.people["aethelhelm"]
+	kid.birth_day = main.clock.day - 6 * 365 - 10
+	kid.guardian = ""
+	kid.edu_years = 0
+	world._grow(kid, main.clock.day, [])
+	eq(kid.guardian, "", "你家孩子不自动请老师")
+	check(kid.focus != "", "学什么自动选了 (可以改)")
+	var other: Person = world.people["owain_g"]  # 格利维辛国王的儿子
+	other.guardian = ""
+	world._grow(other, main.clock.day, [])
+	check(other.guardian != "", "电脑家的孩子自动请老师")
+
+
+# ---- 开局设置 ----
+
+func test_rules_window_before_start() -> void:
+	var seed := world.name_seed
+	check(click_hud(Hud.RULES_BUTTON.get_center()), "点横幅下面的「开局设置」")
+	eq(hud.popup.get("kind", ""), "rules")
+	check(click_hud(hud._rule_option(0, 2).get_center()), "生成家人选「关」")
+	world = main.world
+	hud = main.hud
+	map = main.map
+	eq(world.rules.generate_families, "off")
+	eq(world.name_seed, seed, "同一个种子重新开局")
+	check(not world.ruler("east_anglia").married())
+	eq(hud.popup.get("kind", ""), "rules", "设置窗口还开着")
+	check(click_hud(hud._menu_back().get_center()), "开始选人")
+	main.play_as("wessex")
+	hud.open_rules()
+	check(click_hud(hud._rule_option(0, 0).get_center()))
+	eq(world.rules.generate_families, "off", "开始以后不能改")
+
+
+func test_ironman_menu() -> void:
+	main.new_game({"ironman": "on"}, 5)
+	world = main.world
+	hud = main.hud
+	map = main.map
+	main.play_as("wessex")
+	hud._menu()
+	check(click_hud(hud._menu_button(1).get_center()), "点存档")
+	eq(hud.popup.view, "main", "铁人模式不能自己存档")
+	has_text(hud._toast, "铁人模式")
+	hud.close_popup()
+	main.clock.paused = false
+	main.clock.set_speed(5)
+	while GameDate.from_day(main.clock.day)[1] < 7:
+		main._process(1.0)
+	check(SaveGame.list().any(func(x: Dictionary) -> bool: return x.label == "铁人模式"), "过了半年自动存了铁人模式的档")

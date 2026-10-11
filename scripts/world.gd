@@ -26,6 +26,8 @@ var kids_of := {}        # 父母的 id -> [孩子的 id, ...] (按出生先后)
 var ancestor_cache := {} # 人的 id -> 祖先 (Marriage.ancestors 算好存这里, 祖先不会变)
 var history_marriages: Array = []  # 史料里开局以后的婚事 [{a, b, year, note}]
 var history_children: Array = []   # 史料里开局以后出生的孩子 [{father, mother?, kids: [{id, name, female, note}]}]
+var rules := Rules.defaults()  # 开局设置 (照三代的游戏规则; 开局前选好)
+var generated_by := {}         # 开局生成的家人: 一家之主的 id -> [妻子、孩子的 id] (「只给电脑」时玩家选的人要拿掉)
 var player := ""         # 玩家这个人的 id (电脑不替玩家家里的人说亲, 不收回玩家的地); main 每一帧同步
 var today := 0           # 现在是哪天 (advance 时更新; 算直辖上限、收入要用)
 var houses := {}         # 家族 id -> {id, name, desc, color, design}
@@ -57,8 +59,11 @@ const STUDY_YEARS := 10       # 6 岁学到 15 岁
 
 
 ## seed: 随机的东西 (查不到的人的名字、长相基因、生日、性格, 开局以后谁什么时候死) 用的种子, 每局开新游戏换一个
-static func load_867(name_seed: int = 867) -> World:
+static func load_867(name_seed: int = 867, p_rules: Dictionary = {}) -> World:
 	var w := World.new()
+	w.name_seed = name_seed
+	w.rules.merge(p_rules, true)
+	Person.child_health = Rules.CHILD_HEALTH.get(w.rules.child_death, Rules.CHILD_HEALTH.normal)
 	w._load(_read_json(WORLD_FILE), _read_json(MAP_FILE), _read_json(NAMES_FILE), name_seed)
 	return w
 
@@ -132,13 +137,8 @@ func _load(data: Dictionary, map: Dictionary, p_names: Dictionary, name_seed: in
 		realm_order.append(r.id)
 	for f in data.get("family", []):
 		_add_family(setup, f)
-	for p in people.values():  # 配偶两边都记上
-		if p.spouse != "" and people.has(p.spouse):
-			people[p.spouse].spouse = p.id
-	for p in people.values():
-		if p.spouse != "" and people.has(p.spouse):
-			p.spouse_ref = weakref(people[p.spouse])
-	var history: Dictionary = data.get("history", {})
+	_link_spouses()
+	var history: Dictionary = data.get("history", {}) if rules.history == "on" else {}
 	history_marriages = history.get("marriages", [])
 	history_children = history.get("children", [])
 	_setup_children(setup)
@@ -168,6 +168,74 @@ func _load(data: Dictionary, map: Dictionary, p_names: Dictionary, name_seed: in
 	_setup_homelands()
 	today = start_day
 	_setup_vassals(setup, data.get("vassals", []))
+	_link_spouses()  # 封臣在家人后面读, 家人里有封臣的妻子 (埃德伯)
+	_generate_families(setup)
+
+
+# ---- 存档 (照三代: 随时能存、能读, 每年自动存一次) ----
+
+var name_seed := 867     # 开局用的种子 (读档时先照它把地图、名字表这些读出来, 再盖上存档里的)
+
+
+func to_save() -> Dictionary:
+	var ps := []
+	for p in people.values():
+		ps.append(p.to_save())
+	var rs := {}
+	for rid in realms:
+		var r: Dictionary = realms[rid].duplicate(true)
+		r.color = r.color.to_html()
+		rs[rid] = r
+	var hs := {}
+	for hid in houses:
+		var h: Dictionary = houses[hid].duplicate()
+		h.color = h.color.to_html()
+		hs[hid] = h
+	var cs := []
+	for c in counties:
+		cs.append([c.holder, c.lord])
+	return {"name_seed": name_seed, "today": today, "player": player, "rules": rules,
+			"next_index": _next_index, "next_id": _next_id, "rng_seed": str(rng.seed), "rng_state": str(rng.state),
+			"realm_order": realm_order, "realms": rs, "houses": hs, "counties": cs, "people": ps}
+
+
+## 读档: 先照开局的种子读出地图、名字表、史料这些不变的东西, 再换成存档里的人、国家、家族、领地
+static func from_save(s: Dictionary) -> World:
+	var w := World.load_867(int(s.name_seed), s.get("rules", {}))
+	w.people = {}
+	w.living = {}
+	w.kids_of = {}
+	w.ancestor_cache = {}
+	for d in s.people:  # 照存的先后放回去 (每个月一个个看人的先后一样, 读档以后接着走跟没存过一样)
+		w._register(Person.from_save(d))
+	w._link_spouses()
+	w.realms = {}
+	for rid in s.realms:
+		var r: Dictionary = s.realms[rid]
+		r.color = Color(r.color)
+		r.index = int(r.index)
+		w.realms[rid] = r
+	w.realm_order = s.realm_order.duplicate()
+	w.houses = {}
+	for hid in s.houses:
+		var h: Dictionary = s.houses[hid]
+		h.color = Color(h.color)
+		h.design = int(h.design)
+		w.houses[hid] = h
+	for i in w.counties.size():
+		w.counties[i].holder = s.counties[i][0]
+		w.counties[i].lord = s.counties[i][1]
+	w.today = int(s.today)
+	w.player = s.player
+	w.generated_by = {}
+	w._next_index = int(s.next_index)
+	w._next_id = int(s.next_id)
+	w.rng.seed = int(s.rng_seed)
+	w.rng.state = int(s.rng_state)
+	w._kin_dirty = true
+	w._house_dirty = true
+	w._feudal_dirty = true
+	return w
 
 
 ## 有记载的家人 (world_867.json 的 family)
@@ -230,19 +298,92 @@ func realm_kingdom(realm_id: String) -> String:
 	return kingdom_of(cs[0]).id if not cs.is_empty() else ""
 
 
+## 配偶两边都记上
+func _link_spouses() -> void:
+	for p in people.values():
+		if p.spouse != "" and people.has(p.spouse):
+			people[p.spouse].spouse = p.id
+	for p in people.values():
+		if p.spouse != "" and people.has(p.spouse):
+			p.spouse_ref = weakref(people[p.spouse])
+
+
 ## 开局时的小孩: 3 岁以上有小时候的性格, 6 岁以上已经在跟老师学 (照学了几年先攒好分数)
 func _setup_children(setup: RandomNumberGenerator) -> void:
 	for p in people.values():
-		if not p.alive or p.adult(start_day):
+		if p.alive and not p.adult(start_day):
+			_setup_child(setup, p)
+
+
+func _setup_child(setup: RandomNumberGenerator, p: Person) -> void:
+	var a: int = p.age(start_day)
+	if a >= 3:
+		p.traits.append(Traits.random_childhood(setup))
+	if a >= 6:
+		p.focus = Traits.pick_focus(setup, p.childhood())
+		p.guardian = pick_guardian(p, start_day)
+		p.edu_years = a - 6
+		p.edu_points = p.edu_years * _study_per_year(p, start_day)
+
+
+## 开局设置「生成家人」选了「只给电脑」: 玩家选了一个开局生成过家人的人, 把这些家人拿掉
+func remove_generated_family(head_id: String) -> void:
+	if not generated_by.has(head_id):
+		return
+	var gone: Array = generated_by[head_id]
+	for id in gone:
+		if not people.has(id):
+			continue
+		var p: Person = people[id]
+		people.erase(id)
+		living.erase(id)
+		kids_of.erase(id)
+		for pid in [p.father, p.mother]:
+			if kids_of.has(pid):
+				kids_of[pid].erase(id)
+	var head: Person = people[head_id]
+	head.spouse = ""
+	head.spouse_ref = null
+	for q in living.values():
+		if gone.has(q.guardian):
+			q.guardian = ""
+	generated_by.erase(head_id)
+	ancestor_cache = {}
+	_kin_dirty = true
+	_house_dirty = true
+	_feudal_dirty = true
+
+
+## 开局「生成家人」(照三代的游戏规则, 三代默认开): 有领地、但没有记载家人 (没配偶、没孩子) 的人,
+## 配一个妻子和一个能继承的儿子; 妻子 25 岁以上再一个孩子, 33 岁以上再一个 (名字照当时当地)
+func _generate_families(setup: RandomNumberGenerator) -> void:
+	if rules.generate_families == "off":
+		return
+	for p in living.values().duplicate():
+		if not is_landed(p) or p.female or p.spouse != "" or not p.former_spouses.is_empty() or not kids_of.get(p.id, []).is_empty():
 			continue
 		var a: int = p.age(start_day)
-		if a >= 3:
-			p.traits.append(Traits.random_childhood(setup))
-		if a >= 6:
-			p.focus = Traits.pick_focus(setup, p.childhood())
-			p.guardian = pick_guardian(p, start_day)
-			p.edu_years = a - 6
-			p.edu_points = p.edu_years * _study_per_year(p, start_day)
+		if a < Person.ADULT:
+			continue
+		var wife_age := clampi(a - setup.randi_range(0, 10), 16, 45) if a <= 55 else setup.randi_range(30, 45)
+		var wife := make_noble(p.culture, true, wife_age, start_day)
+		wife.homeland = p.homeland
+		_register(wife)
+		marry(p, wife, start_day, [])
+		generated_by[p.id] = [wife.id]
+		var count := 1 + (1 if wife_age > 25 else 0) + (1 if wife_age > 33 else 0)
+		var age := setup.randi_range(0, clampi(wife_age - 17, 0, 20))
+		for i in count:
+			if age < 0:
+				break
+			var kid := _new_child(p, wife, start_day - age * GameDate.YEAR_DAYS - setup.randi_range(0, 300), 0 if i == 0 else -1)
+			generated_by[p.id].append(kid.id)
+			if kid.adult(start_day):
+				kid.traits = Traits.random_personality(setup) + kid.traits
+				kid.education = Traits.random_education(setup, "king")
+			else:
+				_setup_child(setup, kid)
+			age -= setup.randi_range(1, 4)
 
 
 func _register(p: Person) -> void:
@@ -624,11 +765,13 @@ func _grow(p: Person, day: int, events: Array) -> void:
 		return
 	if p.focus == "":
 		p.focus = Traits.pick_focus(rng, p.childhood())
+	# 照三代 (也是第 4 块清单写的「你家孩子你挑, 电脑家的自动挑」): 学什么自动选, 玩家家里孩子的老师要玩家自己请 (有提醒)
+	var mine := is_player_court(p)
 	if p.guardian != "" and not people[p.guardian].alive:
 		var old := p.guardian
-		p.guardian = pick_guardian(p, day)
+		p.guardian = "" if mine else pick_guardian(p, day)
 		events.append({"type": "guardian", "child": p.id, "old": old, "new": p.guardian, "day": day})
-	elif p.guardian == "" and (p.edu_years == 0 or rng.randf() < 1.0 / 12.0):
+	elif p.guardian == "" and not mine and (p.edu_years == 0 or rng.randf() < 1.0 / 12.0):
 		p.guardian = pick_guardian(p, day)
 	while p.edu_years < mini(a - 5, STUDY_YEARS):
 		p.edu_points += _study_per_year(p, day)
@@ -738,9 +881,10 @@ func _give_birth(mother: Person, day: int, events: Array) -> void:
 		kill(mother, day, events, "生孩子时去世")
 
 
-func _new_child(father: Person, mother: Person, day: int) -> Person:
+## force_female: -1 随机, 0 男孩, 1 女孩 (开局生成家人时第一个要能继承, 是男孩)
+func _new_child(father: Person, mother: Person, day: int, force_female := -1) -> Person:
 	var p := Person.new()
-	p.female = rng.randf() < 0.5
+	p.female = rng.randf() < 0.5 if force_female < 0 else force_female == 1
 	var doc := _history_kid(father, mother, p.female)
 	p.id = doc.id if not doc.is_empty() else _new_person_id()
 	p.father = father.id if father else ""

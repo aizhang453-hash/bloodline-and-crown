@@ -56,10 +56,11 @@ func test_children_look_like_parents() -> void:
 func test_heirs_at_start() -> void:
 	eq(w.heir("wessex", w.start_day).id, "alfred", "长者继承: 威塞克斯是弟弟阿尔弗雷德, 不是小儿子")
 	eq(w.heir("gwynedd", w.start_day).id, "anarawd", "平分: 格温内斯是长子安纳拉乌德")
-	eq(w.heir("great_army", w.start_day).id, "halfdan", "平分: 伊瓦尔没儿子, 是哥哥哈夫丹")
+	# 开局「生成家人」(照三代默认开): 伊瓦尔、埃德蒙没有记载的家人, 开局配了妻子和儿子
+	eq(w.heir("great_army", w.start_day).father, w.ruler("great_army").id, "平分: 伊瓦尔的儿子在前 (生成的家人)")
 	eq(w.heir("alba", w.start_day).id, "aed_alba", "推举: 阿尔巴是成年的弟弟艾德, 不是 5 岁的儿子")
 	eq(w.heir("dublin", w.start_day).id, "carlus", "平分: 都柏林是大儿子卡卢斯")
-	check(w.heir("east_anglia", w.start_day) == null, "埃德蒙家族里没人")
+	eq(w.heir("east_anglia", w.start_day).father, w.ruler("east_anglia").id, "埃德蒙开局生成了儿子")
 	for id in ["ailech", "osraige"]:
 		var h := w.heir(id, w.start_day)
 		check(h != null and h.adult(w.start_day) and not h.female, id + " 推举出成年男人")
@@ -108,6 +109,8 @@ func test_merge_when_heir_already_rules() -> void:
 
 
 func test_extinct_house_gets_new_ruler() -> void:
+	for c in w.children_of(person("ruler_east_anglia")):  # 生成的儿子先死
+		w.kill(c, w.start_day + 5, [])
 	var events := die("ruler_east_anglia")
 	var ev: Dictionary = events.filter(func(e: Dictionary) -> bool: return e.type == "extinct")[0]
 	var newp := w.ruler("east_anglia")

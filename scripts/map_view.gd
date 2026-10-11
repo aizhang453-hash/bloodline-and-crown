@@ -1,13 +1,17 @@
 class_name MapView
 extends Node2D
-## 地图: 领地图按国家 (或公国、王国、帝国) 上色, 能拖、能缩放、点一下选中一块领地。
+## 地图: 领地图按国家 (或公国、王国、帝国、家族) 上色, 能拖、能缩放、点一下选中一块领地。
+## 第 5 块 (学三代): 同一个国家里不同主人的地之间画细线, 每个主人的地上画他的纹章 (国王加小王冠);
+## 选中一个人 (人物窗口、领地窗口) 时, 他直辖的地亮起来, 他的封臣照常, 别的地方暗下去。
 ## 地图上的坐标就是领地图的像素坐标 (一个像素 0.5 公里)。
 
 signal county_clicked(index: int)   # 0 = 点在海上
 signal county_hovered(index: int)
 
-enum Mode { REALM, DUCHY, KINGDOM, EMPIRE }
-const MODE_NAMES := ["国家", "公国", "王国", "帝国"]
+enum Mode { REALM, DUCHY, KINGDOM, EMPIRE, HOUSE }
+const MODE_NAMES := ["国家", "公国", "王国", "帝国", "家族"]
+const SHIELD_ZOOM := 0.55      # 放大到这么大才画纹章 (再远只看国家, 跟三代的「纸地图」一样)
+const SHIELD_PX := 30.0        # 纹章在屏幕上多大
 const KINGDOM_COLORS := {"england": "a8433a", "scotland": "3d6299", "wales": "418a4b", "ireland": "c4a24c"}
 const EMPIRE_COLOR := Color("7b5a8f")
 const ZOOM_MIN := 0.36
@@ -21,6 +25,7 @@ var pmap: ProvinceMap
 var mode := Mode.REALM
 var hovered := 0
 var selected := 0
+var focus_person := ""         # 选中的人 (他的地亮起来); 空 = 没选
 var camera := Camera2D.new()
 var overlay := MapOverlay.new()
 
@@ -31,6 +36,7 @@ var _lookup_tex: ImageTexture
 var _dragging := false
 var _drag_moved := 0.0
 var _time := 0.0
+var _lord_codes := {}           # 主人的 id -> 编号 (第 2 行用)
 
 
 func _init(p_world: World, p_pmap: ProvinceMap) -> void:
@@ -52,7 +58,7 @@ func _ready() -> void:
 	add_child(overlay)
 	add_child(camera)
 	camera.make_current()
-	_lookup = Image.create(world.counties.size() + 1, 2, false, Image.FORMAT_RGBA8)
+	_lookup = Image.create(world.counties.size() + 1, 3, false, Image.FORMAT_RGBA8)
 	_lookup_tex = ImageTexture.create_from_image(_lookup)
 	_material.set_shader_parameter("lookup", _lookup_tex)
 	_material.set_shader_parameter("provinces", pmap.texture)
@@ -94,6 +100,36 @@ func set_selected(index: int) -> void:
 	_material.set_shader_parameter("selected", index)
 
 
+## 选中一个人: 他直辖的地亮起来, 他下面的封臣照常, 别的暗下去 (空 = 不选)
+func set_focus_person(id: String) -> void:
+	if id == focus_person:
+		return
+	focus_person = id
+	refresh_colors()
+
+
+## 这块地在选中的人下面吗 (主人是他, 或者主人一层层往上是他)
+func _under(c: Dictionary, p: Person) -> int:
+	var lord: Person = world.people[c.lord]
+	if lord == p:
+		return 2
+	var up := world.liege_of(lord)
+	for i in 4:
+		if up == null:
+			return 0
+		if up == p:
+			return 1
+		up = world.liege_of(up)
+	return 0
+
+
+## 家族的颜色: 统治家族跟国家一样; 别的家族按名字算一个固定的颜色 (同一个家族每次一样)
+func house_color(house: String) -> Color:
+	if world.houses.has(house) and world.houses[house].color != Color(0.4, 0.4, 0.42):
+		return world.houses[house].color
+	return Color.from_hsv(fmod(float(hash(house) % 997) / 997.0 + 0.13, 1.0), 0.5, 0.72)
+
+
 ## 按现在的地图模式重新上色。领地换了主人以后也要调一次。
 func refresh_colors() -> void:
 	for c in world.counties:
@@ -111,11 +147,33 @@ func refresh_colors() -> void:
 				var k: String = world.duchy_of(c).kingdom
 				group = world.kingdoms.keys().find(k) + 1
 				col = Color(KINGDOM_COLORS[k])
+			Mode.HOUSE:
+				var r2: Dictionary = world.realm_of(c)
+				col = house_color(world.people[c.lord].house)
+				group = r2.index
 			_:
 				group = 1
 				col = EMPIRE_COLOR
+		# 同一个国家里不同主人之间画细线 (国家、家族模式才分)
+		var lord_code := group
+		if mode in [Mode.REALM, Mode.HOUSE]:
+			lord_code = _lord_codes.get(c.lord, 0)
+			if lord_code == 0:
+				lord_code = _lord_codes.size() + 1
+				_lord_codes[c.lord] = lord_code
+		# 选中了一个人: 他直辖的亮, 他的封臣照常, 同一个国家别的暗一些, 别的国家更暗
+		if focus_person != "" and world.people.has(focus_person) and mode in [Mode.REALM, Mode.HOUSE]:
+			var fp: Person = world.people[focus_person]
+			match _under(c, fp):
+				2:
+					col = col.lightened(0.28)
+				1:
+					pass
+				_:
+					col = col.darkened(0.35 if c.holder == world.realm_of_person(fp) else 0.55)
 		_lookup.set_pixel(c.index, 0, col)
 		_lookup.set_pixel(c.index, 1, Color8(group >> 8, group & 255, 0))
+		_lookup.set_pixel(c.index, 2, Color8(lord_code >> 8, lord_code & 255, 0))
 	_lookup_tex.update(_lookup)
 	overlay.queue_redraw()
 
@@ -233,6 +291,9 @@ class MapOverlay:
 			for c in w.counties:
 				draw_circle(c.seat, 2.6 / z, Color(0.12, 0.1, 0.07, 0.9))
 				_label(font, c.center + Vector2(0, size * 0.35), c.name, size, 3.0 / z)
+		if z >= MapView.SHIELD_ZOOM and view.mode in [MapView.Mode.REALM, MapView.Mode.HOUSE]:
+			for sh in shields():
+				_shield(sh, z)
 		if z < 1.35:
 			var alpha := clampf((1.35 - z) / 0.35, 0.0, 1.0)
 			for g in _groups():
@@ -241,6 +302,44 @@ class MapOverlay:
 				if size * z < 9.0:
 					continue
 				_label(font, g.pos + Vector2(0, size * 0.35), g.text, int(size), size * 0.08, alpha)
+
+	## 每个有领地的人一个纹章, 放在他直辖的地中间: [{person, pos, king}]
+	func shields() -> Array:
+		var w := view.world
+		var by_lord := {}
+		for c in w.counties:
+			if not by_lord.has(c.lord):
+				by_lord[c.lord] = {"sum": Vector2.ZERO, "area": 0.0}
+			var px := float(c.area_km2)
+			by_lord[c.lord].sum += c.center * px
+			by_lord[c.lord].area += px
+		var out := []
+		for id in by_lord:
+			var p: Person = w.people[id]
+			out.append({"person": p, "pos": by_lord[id].sum / by_lord[id].area, "king": p.realm != ""})
+		return out
+
+	## 一个纹章 (屏幕上大小不变): 国王画国家的纹章, 上面一顶小王冠; 封臣画家族的纹章
+	func _shield(sh: Dictionary, z: float) -> void:
+		var w := view.world
+		var s := MapView.SHIELD_PX / z
+		var p: Person = sh.person
+		# 放大了领地名字在中间, 纹章画在名字上面; 国家名字还看得见时, 国王的纹章再往上挪, 不压住国家名字
+		var lift := 1.1 if z >= 1.0 else 0.2
+		if sh.king and z < 1.35:
+			lift += 1.3
+		var center: Vector2 = sh.pos - Vector2(0, s * lift)
+		var r := Rect2(center - Vector2(s * 0.42, s * 0.5), Vector2(s * 0.84, s))
+		var dim := view.focus_person != "" and view.focus_person != p.id and (w.liege_of(p) == null or w.liege_of(p).id != view.focus_person)
+		if sh.king and w.realms.has(p.realm):
+			Icons.realm_arms(self, r, w.realms[p.realm])
+			Icons.draw(self, "crown", center - Vector2(0, s * 0.72), s * 0.62, Icons.GOLD)
+		elif w.houses.has(p.house):
+			var hs: Dictionary = w.houses[p.house]
+			var col := view.house_color(p.house)
+			Icons.arms(self, r, int(hs.design) % Icons.DESIGNS, col, Icons.charge_color(col, int(hs.design)))
+		if dim:
+			draw_rect(r.grow(s * 0.05), Color(0.05, 0.05, 0.06, 0.45))
 
 	func _label(font: Font, pos: Vector2, s: String, size: int, outline: float, alpha := 1.0) -> void:
 		var width := font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
@@ -265,6 +364,10 @@ class MapOverlay:
 				MapView.Mode.KINGDOM:
 					key = w.duchy_of(c).kingdom
 					text = w.kingdom_of(c).name
+				MapView.Mode.HOUSE:
+					var lord: Person = w.people[c.lord]
+					key = lord.house
+					text = w.house_name(lord.house)
 				_:
 					key = "empire"
 					text = w.empire.name

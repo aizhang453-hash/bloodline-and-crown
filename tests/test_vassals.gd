@@ -60,13 +60,35 @@ func test_vassal_names_by_region() -> void:
 
 
 func test_domain_limit() -> void:
+	# 照三代现在的算法 (用户 2026-10-10 选的): 基础 1 + 头衔 2 + 教育 (差 -1、一般 0、好 +1、出色 +2)
 	var k := w.ruler("wessex")
-	k.base_skills.stewardship = 0
 	k.education = {}
-	k.traits = []
-	eq(Feudal.domain_limit(k, w.start_day), 2, "2 块起")
-	k.base_skills.stewardship = 10
-	eq(Feudal.domain_limit(k, w.start_day), 4, "管理 10: 4 块")
+	eq(Feudal.domain_limit(k, w.start_day), 3, "没教育: 3 块")
+	k.base_skills.stewardship = 30
+	eq(Feudal.domain_limit(k, w.start_day), 3, "管理本事不算 (三代现在不看)")
+	for lv in [[1, 2], [2, 3], [3, 4], [4, 5]]:
+		k.education = {"skill": "stewardship", "level": lv[0]}
+		eq(Feudal.domain_limit(k, w.start_day), lv[1], "教育第 %d 档" % lv[0])
+
+
+func test_generate_families() -> void:
+	# 照三代的「生成家人」(默认开): 有领地、没记载家人的人开局有妻子和能继承的儿子
+	var edmund := w.ruler("east_anglia")
+	check(edmund.married(), "埃德蒙开局有妻子")
+	var kids := w.children_of(edmund)
+	check(not kids.is_empty() and not kids[0].female, "第一个孩子是儿子")
+	eq(w.heir("east_anglia", w.start_day), kids[0], "儿子是继承人")
+	var wife := edmund.living_spouse()
+	check(kids.size() >= (1 + (1 if wife.age(w.start_day) > 25 else 0) + (1 if wife.age(w.start_day) > 33 else 0)), "母亲 25 岁以上第二个孩子, 33 岁以上第三个")
+	for c in kids:
+		check(c.age(w.start_day) <= wife.age(w.start_day) - 17, "孩子不比母亲小太多")
+	var berk := person("aethelwulf_berkshire")
+	check(berk.married(), "伯克郡郡长也有了家人")
+	# 有记载家人的不生成
+	eq(person("aethelred_mucel").spouse, "eadburh", "埃塞尔雷德·穆赫尔的妻子是史料里的埃德伯")
+	eq(w.children_of(w.ruler("gwynedd")).size(), 7, "罗德里还是史料里的七个儿子")
+	eq(w.ruler("alba").spouse, "", "康斯坦丁有记载的儿子, 不给他生成妻子 (三代也只管完全没家人的)")
+	check(not person("alfred").married(), "没领地的人不生成")
 
 
 func test_income_and_contract() -> void:
@@ -248,6 +270,8 @@ func test_vassal_succession() -> void:
 	son.birth_day = w.start_day - 20 * GameDate.YEAR_DAYS
 	son.traits = Traits.random_personality(w.rng)
 	son.education = {"skill": "martial", "level": 2}
+	for c in w.children_of(v):  # 开局生成的孩子先死, 只留测试的儿子
+		w.kill(c, w.start_day + 2, [])
 	w._register(son)
 	var events := []
 	w.kill(v, w.start_day + 3, events)

@@ -2468,7 +2468,8 @@
    "house": "gaini",
    "culture": "anglo_saxon",
    "note": "麦西亚贵族的女儿: 父亲埃塞尔雷德·穆赫尔是盖尼人的郡长, 母亲埃德伯是麦西亚王族。史料里: 868 年嫁给阿尔弗雷德。生年不详, 估计",
-   "father": "aethelred_mucel"
+   "father": "aethelred_mucel",
+   "mother": "eadburh"
   },
   {
    "id": "gormlaith_brega",
@@ -2488,7 +2489,18 @@
    "house": "gaini",
    "culture": "anglo_saxon",
    "father": "aethelred_mucel",
-   "note": "埃塞尔雷德·穆赫尔的儿子, 埃尔斯维斯的弟弟 (史料: 后来当了郡长, 903 年去世)。生年估计"
+   "note": "埃塞尔雷德·穆赫尔的儿子, 埃尔斯维斯的弟弟 (史料: 后来当了郡长, 903 年去世)。生年估计",
+   "mother": "eadburh"
+  },
+  {
+   "id": "eadburh",
+   "name": "埃德伯",
+   "female": true,
+   "born": 825,
+   "house": "",
+   "culture": "anglo_saxon",
+   "spouse": "aethelred_mucel",
+   "note": "埃塞尔雷德·穆赫尔的妻子, 埃尔斯维斯的母亲 (阿瑟: 出身麦西亚王族, 「一位了不起的女人」, 丈夫死后守寡多年, 阿瑟亲眼见过她)。生年估计"
   }
  ],
  "history": {

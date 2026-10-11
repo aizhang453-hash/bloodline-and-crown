@@ -8,9 +8,30 @@ var map: MapView
 var hud: Hud
 
 
+var _year := 0     # 现在是哪一年 (换年时自动存档)
+var allow_quit := true  # 测试里关掉 (乱玩点到「退出游戏」不能把测试关了)
+
+
 func _ready() -> void:
-	world = World.load_867(randi())
-	clock = Clock.new(world.start_day)
+	new_game({}, randi())
+
+
+## 开一局新游戏 (开局设置改了也是重新开: 同一个种子, 名字这些不变)
+func new_game(rules: Dictionary, seed: int) -> void:
+	var w := World.load_867(seed, rules)
+	_build(w, Clock.new(w.start_day))
+
+
+## 搭起地图和界面 (开新游戏、读档都用)
+func _build(w: World, c: Clock) -> void:
+	for old in [map, hud]:
+		if old != null:
+			remove_child(old)
+			old.queue_free()
+	world = w
+	clock = c
+	var ym: Array = GameDate.from_day(clock.day)
+	_year = int(ym[0]) * 2 + (1 if int(ym[1]) >= 7 else 0)
 	map = MapView.new(world, ProvinceMap.new())
 	add_child(map)
 	hud = Hud.new(world, clock, map)
@@ -21,6 +42,13 @@ func _ready() -> void:
 	hud.mode_requested.connect(_on_mode)
 	hud.close_requested.connect(close_panel)
 	hud.events_happened.connect(handle_events)
+	hud.save_requested.connect(save_game)
+	hud.load_requested.connect(load_game)
+	hud.quit_requested.connect(_quit)
+	hud.rules_changed.connect(func(r: Dictionary) -> void:
+		new_game(r, world.name_seed)
+		hud.open_rules())
+	hud.new_game_requested.connect(func() -> void: new_game({}, randi()))
 
 
 func _process(delta: float) -> void:
@@ -28,6 +56,17 @@ func _process(delta: float) -> void:
 	if days > 0:
 		world.player = hud.player_id
 		handle_events(world.advance(days, clock.day))
+		var ym: Array = GameDate.from_day(clock.day)
+		var half: int = int(ym[0]) * 2 + (1 if int(ym[1]) >= 7 else 0)
+		if half != _year:
+			var new_year: bool = int(ym[0]) != _year / 2
+			_year = half
+			if hud.player_id != "":
+				# 照三代: 平时每年自动存一次; 铁人模式每半年存一次 (只有这一个档)
+				if world.rules.ironman == "on":
+					save_game("铁人模式", _ironman_file())
+				elif new_year:
+					save_game("自动存档", SaveGame.AUTO)
 		hud.redraw()
 
 
@@ -73,7 +112,7 @@ func handle_events(events: Array) -> void:
 			"guardian":
 				var kid: Person = world.people[e.child]
 				if _mine(kid):
-					var who: String = ("换成了" + world.people[e.new].name) if e.new != "" else "暂时没有老师 (可以在人物窗口请一个)"
+					var who: String = ("换成了" + world.people[e.new].name) if e.new != "" else "要给他请一个新老师 (上面的提醒)"
 					hud.notify("%s的老师%s去世了, %s" % [kid.name, world.people[e.old].name, who])
 			"succession", "extinct":
 				map_changed = map_changed or not e.splits.is_empty() or e.merged_into != "" or e.type == "extinct"
@@ -138,9 +177,56 @@ func _on_marriage(e: Dictionary) -> void:
 		hud.notify(text)
 
 
+## 退出: 铁人模式退出前先存
+func _quit() -> void:
+	if world.rules.ironman == "on" and hud.player_id != "":
+		save_game("铁人模式", _ironman_file())
+	if allow_quit:
+		get_tree().quit()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST and world != null and world.rules.ironman == "on" and hud.player_id != "":
+		save_game("铁人模式", _ironman_file())
+
+
+func _ironman_file() -> String:
+	return "ironman_%d" % world.name_seed
+
+
+## 存档: 世界、日期、速度, 还有玩家在看地图的哪里、哪种地图模式
+func save_game(label: String, file := "") -> String:
+	var extra := {"mode": map.mode, "cam_x": map.camera.position.x, "cam_y": map.camera.position.y, "zoom": map.zoom()}
+	var path := SaveGame.write(label, world, clock, extra, file)
+	if file != SaveGame.AUTO and not file.begins_with("ironman"):
+		hud.toast("存好了: " + label)
+	return path
+
+
+## 读档: 换掉现在的世界 (读完是暂停的)
+func load_game(path: String) -> void:
+	var d := SaveGame.read(path)
+	if d.is_empty() or not d.has("world"):
+		hud.toast("这个存档读不了")
+		return
+	var w := World.from_save(d.world)
+	var c := Clock.new(int(d.day))
+	c.speed = int(d.get("speed", 1))
+	c.paused = true
+	_build(w, c)
+	if w.player != "" and w.people.has(w.player):
+		hud.set_player(w.player)
+	var ex: Dictionary = d.get("extra", {})
+	map.set_mode(int(ex.get("mode", 0)))
+	map.focus(Vector2(float(ex.get("cam_x", 0)), float(ex.get("cam_y", 0))), float(ex.get("zoom", 0.5)))
+	hud.toast("读了存档: %s (%s)" % [d.get("label", ""), GameDate.text(c.day)])
+
+
 ## 选一个人来玩: 给国家 id 就是那个国家的国王, 不然是人的 id (国王或者封臣)
 func play_as(who: String) -> void:
 	var id: String = world.realms[who].ruler_id if world.realms.has(who) else who
+	if world.rules.generate_families == "ai":
+		world.remove_generated_family(id)  # 开局设置「生成家人: 只给电脑」
 	hud.set_player(id)
 	hud.toast("你现在是%s %s。按空格让时间走起来" % [world.title_of(world.people[id]), world.people[id].name])
 

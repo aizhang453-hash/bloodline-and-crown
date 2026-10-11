@@ -170,6 +170,9 @@ static func problem(w: World, a: Person, b: Person, day: int, betrothal := false
 		return "同一个人"
 	if not a.alive or not b.alive:
 		return "人已经去世了"
+	for p in [a, b]:
+		if p.prisoner_of != "":
+			return "%s关在大牢里" % p.name
 	if a.female == b.female:
 		return "两个人都是%s" % ("女的" if a.female else "男的")
 	for p in [a, b]:
@@ -183,9 +186,6 @@ static func problem(w: World, a: Person, b: Person, day: int, betrothal := false
 		return "还没满 16 岁 (可以先订婚)"
 	if a.realm != "" and b.realm != "":
 		return "两个国王不能结婚 (只有男人当国王)"
-	for p in [a, b]:
-		if p.prisoner_of != "":
-			return "%s关在大牢里" % p.name
 	return kin_problem(w, a, b)
 
 

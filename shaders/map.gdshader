@@ -1,5 +1,6 @@
 // 地图着色器: 领地图 (provinces) 每个像素是领地编号, 按 lookup 表上色。
-// lookup 表第 0 行: 编号 -> 颜色; 第 1 行: 编号 -> 属于哪一组 (国家 / 公国 / 王国), 组和组之间画粗线。
+// lookup 表第 0 行: 编号 -> 颜色; 第 1 行: 编号 -> 属于哪一组 (国家 / 公国 / 王国), 组和组之间画粗线;
+// 第 2 行: 编号 -> 这块地的主人 (第 5 块: 同一个国家里不同主人的地之间画一条细一点的线, 学三代分出封臣)。
 shader_type canvas_item;
 
 uniform sampler2D provinces : filter_nearest;
@@ -17,6 +18,11 @@ int id_at(ivec2 p, ivec2 size) {
 
 int group_of(int id) {
 	vec4 c = texelFetch(lookup, ivec2(id, 1), 0);
+	return int(round(c.r * 255.0)) * 256 + int(round(c.g * 255.0));
+}
+
+int lord_of(int id) {
+	vec4 c = texelFetch(lookup, ivec2(id, 2), 0);
 	return int(round(c.r * 255.0)) * 256 + int(round(c.g * 255.0));
 }
 
@@ -45,7 +51,9 @@ void fragment() {
 		vec3 col = texelFetch(lookup, ivec2(id, 0), 0).rgb;
 		col *= 0.9 + 0.14 * grain;
 		int g = group_of(id);
+		int lord = lord_of(id);
 		bool county_edge = false;
+		bool lord_edge = false;
 		bool group_edge = false;
 		bool coast = false;
 		for (int k = 0; k < 8; k++) {
@@ -54,11 +62,16 @@ void fragment() {
 			int n1 = id_at(ivec2(floor(tp + o * s * 1.0)), size);
 			int n2 = id_at(ivec2(floor(tp + o * s * 2.2)), size);
 			if (n1 == 0 || n2 == 0) { coast = true; }
-			if (n1 != id && n1 != 0) { county_edge = true; if (group_of(n1) != g) { group_edge = true; } }
+			if (n1 != id && n1 != 0) {
+				county_edge = true;
+				if (group_of(n1) != g) { group_edge = true; } else if (lord_of(n1) != lord) { lord_edge = true; }
+			}
 			if (n2 != id && n2 != 0 && group_of(n2) != g) { group_edge = true; }
 		}
 		if (group_edge) {
 			col *= 0.32;
+		} else if (lord_edge) {
+			col *= 0.5;
 		} else if (county_edge) {
 			col = mix(col, col * 0.55, 0.6);
 		}
